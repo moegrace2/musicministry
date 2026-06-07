@@ -340,37 +340,31 @@ body.maintenance .toolbar-row.edit-only{display:flex;}
   .toolbar-row { flex-wrap: wrap; gap: 8px; }
   .toolbar-row .btn { flex: 1; min-width: 80px; }
   .calMonthNav { width: 100%; justify-content: center; }
-  #calendarMonthGrid { 
-    display: block;
-    column-count: unset;
-    font-size: 13px;
+#calendarMonthGrid {
+    grid-template-columns: repeat(7, 1fr);
+    gap: 2px;
+    font-size: 9px;
   }
   #calendarMonthGrid .cal-day {
-    width: 100%;
-    box-sizing: border-box;
-    min-height: unset;
-    padding: 6px 10px;
-    margin-bottom: 4px;
-    flex-direction: row;
-    gap: 10px;
-    align-items: flex-start;
+    min-height: 44px;
+    padding: 3px;
+    font-size: 9px;
   }
   #calendarMonthGrid .cal-day strong {
-    min-width: 28px;
-    font-size: 13px;
-    margin-bottom: 0;
-    padding-top: 2px;
+    font-size: 10px;
+    margin-bottom: 2px;
   }
-  #	#calendarMonthGrid .cal-day.muted {
-    display: none;
+  #calendarMonthGrid .cal-day .event {
+    font-size: 8px;
+    padding: 1px 3px;
+    margin: 1px 0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
-  /* Hide day-of-week headers on mobile - they are the first 7 divs without cal-day class */
   #calendarMonthGrid div:not(.cal-day) {
-    display: none;
-  }
-  /* Hide empty days (only have a strong number child, no events) */
-  #calendarMonthGrid .cal-day:not(:has(.event)) {
-    display: none;
+    font-size: 9px;
+    padding: 3px 0;
   }
 
   /* Hide sidebar, show bottom nav */
