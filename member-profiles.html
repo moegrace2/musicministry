@@ -382,7 +382,9 @@ body.maintenance .toolbar-row.edit-only{display:flex;}
 }
 
 /* Hide bottom nav on desktop */
-#mobileNav { display: none; }
+@media (min-width: 769px) {
+  #mobileNav { display: none; }
+}
 
 </style>
 </head>
