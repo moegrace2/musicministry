@@ -1139,7 +1139,11 @@ async function initSupabase() {
 async function sbGetAll(table) {
   if (!sbReady()) return null;
   const { data, error } = await window._sbClient.from(table).select('*');
-  if (error) { console.warn('sbGetAll', table, error); return null; }
+  if (error) { 
+    console.warn('sbGetAll', table, error);
+    showToast(`DB error on ${table}: ${error.message}`, 'error');
+    return null; 
+  }
   return data || [];
 }
 
