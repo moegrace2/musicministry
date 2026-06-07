@@ -831,26 +831,9 @@ body.maintenance .toolbar-row.edit-only{display:flex;}
           <div><label>Last Name</label><input id="last" type="text" required/></div>
           <div><label>Suffix</label><input id="suffix" type="text" placeholder="Jr., Sr., II"/></div>
         </div>
-        <!-- Hidden fields kept for save compatibility -->
+<!-- Hidden fields kept for save compatibility -->
         <input type="hidden" id="middle"/>
-        <input type="hidden" id="address1"/>
-        <input type="hidden" id="address2"/>
-        <input type="hidden" id="city"/>
-        <select id="state" style="display:none"></select>
-        <input type="hidden" id="zip"/>
-        <input type="hidden" id="phone"/>
-        <input type="hidden" id="email"/>
-        <input type="hidden" id="birthDate"/>
-        <input type="hidden" id="birthMonthDay"/>
-        <select id="gender" style="display:none"></select>
-        <select id="marital" style="display:none"></select>
-        <input type="hidden" id="spouseInput"/>
-        <input type="hidden" id="joinDate"/>
-        <input type="hidden" id="baptismDate"/>
         <select id="status" style="display:none"><option value="active" selected>Active</option><option value="inactive">Inactive</option><option value="archived">Archived</option></select>
-        <input type="hidden" id="hasNonMemberChildren"/>
-        <input type="hidden" id="childrenInput"/>
-        <div id="childrenChips" style="display:none"></div>
         <datalist id="membersDatalist"></datalist>
         <!-- Row 2: Ministries + Photo side by side -->
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-top:4px">
@@ -886,35 +869,7 @@ body.maintenance .toolbar-row.edit-only{display:flex;}
     <div class="modal-body" id="viewBody"></div>
   </dialog>
 
-  <dialog id="familyModal">
-    <div class="modal-head">
-      <strong>Edit Family</strong>
-      <div class="row-inline"><button class="btn" id="closeFamilyBtn" type="button">Close</button></div>
-    </div>
-    <div class="modal-body">
-      <div class="row two">
-        <div><label>Family Photo</label><input id="familyPhotoFile" type="file" accept="image/*"/><div class="muted" style="margin-top:6px">Optional. Stored in meta by family key.</div></div>
-        <div><label>Preview</label><img id="familyPhotoPreview" class="photo-preview" alt="family preview" style="display:none"/></div>
-      </div>
-      <div class="row two" style="margin-top:10px">
-        <div><label>Add Child (member)</label><input id="familyChildInput" list="membersDatalist" placeholder="Search name, press Enter"/><div id="familyChildrenChips" class="chips"></div></div>
-      </div>
-      <div style="border:1px dashed var(--border);border-radius:12px;padding:12px;margin-top:10px">
-        <div class="muted" style="margin-bottom:8px;font-size:12px">Non-Member Family — type name and press Enter to add</div>
-        <div style="margin-bottom:8px">
-          <label>Non-Member Spouse</label>
-          <input id="nonMemberSpouse" style="width:100%" placeholder="Spouse name (if not a member)"/>
-        </div>
-        <div>
-          <label>Non-Member Children</label>
-          <input id="nonMemberChildInput" style="width:100%" placeholder="Child name, press Enter to add"/>
-          <div id="nonMemberChildChips" class="chips" style="margin-top:6px"></div>
-        </div>
-      </div>
-      <div class="row-inline" style="margin-top:12px;justify-content:flex-end"><button class="btn primary edit-only" id="saveFamilyBtn" type="button">Save Family</button></div>
-    </div>
-  </dialog>
-  
+    
   <dialog id="manageMinistryModal">
     <div class="modal-head">
       <strong>Edit Ministry</strong>
@@ -929,6 +884,53 @@ body.maintenance .toolbar-row.edit-only{display:flex;}
   </dialog>
 <script>
 'use strict';
+
+/* ---------------- Confirm Dialog (inlined from confirm-dialog.js) ---------------- */
+function showConfirmDialog({ title = 'Confirm', message = 'Are you sure?', confirmText = 'OK', confirmColor = 'primary' } = {}) {
+  return new Promise(resolve => {
+    const overlay = document.createElement('div');
+    overlay.style.cssText = `
+      position:fixed;inset:0;background:rgba(0,0,0,.45);
+      display:flex;align-items:center;justify-content:center;z-index:99999;
+    `;
+
+    const box = document.createElement('div');
+    box.style.cssText = `
+      background:#fff;border-radius:14px;padding:28px 32px;max-width:420px;
+      width:90%;box-shadow:0 10px 30px rgba(0,0,0,.2);font-family:inherit;
+    `;
+
+    box.innerHTML = `
+      <div style="font-size:18px;font-weight:700;margin-bottom:10px;">${title}</div>
+      <div style="font-size:14px;color:#444;margin-bottom:24px;line-height:1.5;">${message}</div>
+      <div style="display:flex;gap:10px;justify-content:flex-end;">
+        <button id="_cdCancel" style="padding:9px 18px;border-radius:9px;border:1px solid #e5e7eb;background:#fff;font-size:14px;font-weight:600;cursor:pointer;">Cancel</button>
+        <button id="_cdConfirm" style="padding:9px 18px;border-radius:9px;border:none;color:#fff;font-size:14px;font-weight:600;cursor:pointer;"></button>
+      </div>
+    `;
+
+    const confirmBtn = box.querySelector('#_cdConfirm');
+    const cancelBtn  = box.querySelector('#_cdCancel');
+
+    // Color the confirm button
+    const colors = { primary:'#1f4aa8', danger:'#dc2626', success:'#16a34a' };
+    confirmBtn.style.background = colors[confirmColor] || colors.primary;
+    confirmBtn.textContent = confirmText;
+
+    function finish(result) {
+      document.body.removeChild(overlay);
+      resolve(result);
+    }
+
+    confirmBtn.addEventListener('click', () => finish(true));
+    cancelBtn.addEventListener('click',  () => finish(false));
+    overlay.addEventListener('click', e => { if (e.target === overlay) finish(false); });
+
+    overlay.appendChild(box);
+    document.body.appendChild(overlay);
+    confirmBtn.focus();
+  });
+}
 
 /* ---------------- Print/PDF helper utilities (added) ---------------- */
 function escapeHtml(s){
@@ -1360,8 +1362,6 @@ async function appendMemberActivity(entry){
 // Clear helper used by import (works in both Electron and IndexedDB)
 
 /********** Data + auth **********/
-const STATES=["AL","AK","AZ","AR","CA","CO","CT","DE","FL","GA","HI","ID","IL","IN","IA","KS","KY","LA","ME","MD","MA","MI","MN","MS","MO","MT","NE","NV","NH","NJ","NM","NY","NC","ND","OH","OK","OR","PA","RI","SC","SD","TN","TX","UT","VT","VA","WA","WV","WI","WY"];
-
 let MINISTRIES = [
   {id:'m1', name:'Choir', desc:''},
   {id:'m2', name:'Praise Team', desc:''},
@@ -1414,14 +1414,6 @@ function updateMinistryBulkControls() {
   });
 }
 
-function digits(v){ return (v||'').replace(/\D/g,''); }
-function formatPhone(v){
-  const d = digits(v).slice(0,10);
-  if(d.length>6) return `${d.slice(0,3)}-${d.slice(3,6)}-${d.slice(6)}`;
-  if(d.length>3) return `${d.slice(0,3)}-${d.slice(3)}`;
-  return d;
-}
-
 function fmtLongDate(d) {
   if (!d) return "";
 
@@ -1454,77 +1446,6 @@ const ACK_STORAGE_KEY = "church_app_acknowledgments_v1"; // matches special-ackn
 
 function nextMemberId(){ return String(members.reduce((mx,m)=>Math.max(mx,Number(m.id)||0),0)+1); }
 function byNameAsc(a,b){ return memberLabel(a).localeCompare(memberLabel(b)); }
-function ageFromDOB(d){
-  if (!d) return "";
-
-  // If the value is a Date object, convert to YYYY-MM-DD
-  if (d instanceof Date && !isNaN(d)) {
-    d = d.toISOString().split("T")[0];
-  }
-
-  // If it's a number (Excel date), convert it
-  if (typeof d === "number") {
-    const excelBase = new Date(1899, 11, 30);
-    const jsDate = new Date(excelBase.getTime() + d * 86400000);
-    d = jsDate.toISOString().split("T")[0];
-  }
-
-  // If still not a string, exit safely
-  if (typeof d !== "string") return "";
-
-  // If MM-DD format (no year)
-  if (/^\d{2}-\d{2}$/.test(d)) return "";
-
-  // If YYYY-MM-DD
-  if (/^\d{4}-\d{2}-\d{2}$/.test(d)) {
-    const dob = new Date(d);
-    if (isNaN(dob)) return "";
-    const today = new Date();
-    let age = today.getFullYear() - dob.getFullYear();
-    const m = today.getMonth() - dob.getMonth();
-    if (m < 0 || (m === 0 && today.getDate() < dob.getDate())) age--;
-    return age >= 0 ? age : "";
-  }
-
-  return "";
-}
-
-function normalizeBirthDate(val) {
-  if (!val) return "";
-
-  // If Excel gives a real Date object
-  if (val instanceof Date && !isNaN(val)) {
-    return val.toISOString().split("T")[0];
-  }
-
-  // If Excel gives a number (Excel serial)
-  if (typeof val === "number") {
-    const excelBase = new Date(1899, 11, 30);
-    const jsDate = new Date(excelBase.getTime() + val * 86400000);
-    return jsDate.toISOString().split("T")[0]; // YYYY-MM-DD
-  }
-
-  // If already correct string (YYYY-MM-DD or MM-DD)
-  if (typeof val === "string") {
-    val = val.trim();
-
-    if (/^\d{2}-\d{2}$/.test(val)) return val;        // MM-DD
-    if (/^\d{4}-\d{2}-\d{2}$/.test(val)) return val;  // YYYY-MM-DD
-
-    return "";
-  }
-
-  return "";
-}
-
-function fmtMDY(d){
-  if(!d) return '';
-  const dt=new Date(d); if(isNaN(dt)) return '';
-  const mm=String(dt.getMonth()+1).padStart(2,'0');
-  const dd=String(dt.getDate()).padStart(2,'0');
-  const yy=String(dt.getFullYear());
-  return `${mm}-${dd}-${yy}`;
-}
 
 /********** Datalist + chips **********/
 function refreshMembersDatalist(){
@@ -1534,15 +1455,6 @@ function refreshMembersDatalist(){
 function findMemberByLabel(label){
   const s = String(label||'').toLowerCase();
   return members.find(m => memberLabel(m).toLowerCase()===s);
-}
-function currentChildrenIds(){
-  return Array.from(document.querySelectorAll('#childrenChips .chip-x')).map(el=>el.dataset.id);
-}
-function addChildChip(m){
-  const chip = document.createElement('span'); chip.className='chip-x'; chip.dataset.id=m.id;
-  chip.innerHTML = `${memberLabel(m)} <button aria-label="Remove">×</button>`;
-  chip.querySelector('button').addEventListener('click', ()=> chip.remove());
-  $('childrenChips').appendChild(chip);
 }
 
 /********** Dropdown Menu Toggle **********/
@@ -1599,9 +1511,6 @@ const filterDialog = $('filterDialog');
 
 const filterStatus = $('filterStatus');
 const filterGender = $('filterGender');
-const filterMarital = $('filterMarital');
-const filterAgeMin = $('filterAgeMin');
-const filterAgeMax = $('filterAgeMax');
 const filterMinistries = $('filterMinistries');
 
 const clearFilterBtn = $('dialogClearFilterBtn');
@@ -1669,10 +1578,6 @@ if (openFilterDialogBtn && filterDialog) {
   openFilterDialogBtn.addEventListener('click', () => {
     if (filterStatus) filterStatus.value = memberFilterState.status;
     if (filterGender) filterGender.value = memberFilterState.gender;
-    if (filterMarital) filterMarital.value = memberFilterState.marital;
-    if (filterAgeMin) filterAgeMin.value = memberFilterState.minAge;
-    if (filterAgeMax) filterAgeMax.value = memberFilterState.maxAge;
-
     if (filterMinistries) {
       Array.from(filterMinistries.options).forEach(opt => {
         opt.selected = memberFilterState.ministries.includes(opt.value);
@@ -1688,9 +1593,6 @@ clearFilterBtn.addEventListener('click', () => {
   memberFilterState = {
     status: '',
     gender: '',
-    marital: '',
-    minAge: '',
-    maxAge: '',
     ministries: []
   };
   filterDialog.close();
@@ -1703,9 +1605,6 @@ applyFilterBtn.addEventListener('click', (e) => {
   memberFilterState = {
     status: filterStatus.value,
     gender: filterGender.value,
-    marital: filterMarital.value,
-    minAge: filterAgeMin.value,
-    maxAge: filterAgeMax.value,
     ministries: Array.from(filterMinistries.selectedOptions).map(o => o.value)
   };
   filterDialog.close();
@@ -1737,24 +1636,6 @@ applyFilterBtn.addEventListener('click', (e) => {
 
   const minFilter = $('minFilter');
   const clearMins = $('clearMins');
-  const childrenInput = $('childrenInput');
-  const closeViewBtn = $('closeViewBtn');
-
-  if (minFilter) minFilter.addEventListener('input', filterMinistriesInModal);
-  if (clearMins) clearMins.addEventListener('click', () => {
-    Array.from($('ministries').options).forEach(o => o.selected = false);
-  });
-
-  if (childrenInput) {
-    childrenInput.addEventListener('keydown', e => {
-      if (e.key === 'Enter') {
-        e.preventDefault();
-        const m = findMemberByLabel(e.target.value.trim());
-        if (m) addChildChip(m);
-        e.target.value = '';
-      }
-    });
-  }
 
   if (closeViewBtn) closeViewBtn.addEventListener('click', () => $('viewModal').close());
   
@@ -1788,11 +1669,6 @@ applyFilterBtn.addEventListener('click', (e) => {
   }
 });
 
-document.addEventListener('input', (e)=>{
-  if(e.target && e.target.id==='zip') e.target.value = digits(e.target.value).slice(0,5);
-  if(e.target && e.target.id==='phone') e.target.value = formatPhone(e.target.value);
-});
-
 /********** Member modal **********/
 let editingId = null;
 let tempPhotoDataUrl = '';
@@ -1801,33 +1677,13 @@ function openModal(m=null){
   editingId = m?.id || null;
   $('modalTitle').textContent = editingId ? 'Edit Member' : 'Add Member';
   $('memberForm').reset();
-  $('childrenChips').innerHTML=''; $('photoPreview').src=''; $('photoPreview').style.display='none';
+  $('photoPreview').src=''; $('photoPreview').style.display='none';
 
-  $('state').innerHTML = '<option value=""></option>'+STATES.map(s=>`<option>${s}</option>`).join('');
   refreshMinistriesSelect();
 
   if(m){
-    ['title','first','middle','last','suffix','phone','email','address1','address2','city','state','zip',
-     'marital','gender','joinDate','baptismDate','status'
+    ['title','first','middle','last','suffix','status'
     ].forEach(k=> { if($(k)) $(k).value = m[k] || ''; });
-
-    // Handle birthDate - could be YYYY-MM-DD or MM-DD format
-    if(m.birthDate){
-      const parts = m.birthDate.split('-');
-      if(parts.length === 3){
-        // Full date YYYY-MM-DD
-        $('birthDate').value = m.birthDate;
-        $('birthMonthDay').value = '';
-      } else if(parts.length === 2){
-        // Month-day only MM-DD
-        $('birthDate').value = '';
-        $('birthMonthDay').value = m.birthDate;
-      }
-    }
-
-    $('spouseInput').value = m.spouseId ? memberLabel(members.find(x=>x.id===m.spouseId) || {first:'',last:''}) : '';
-    (m.childrenIds||[]).forEach(id=>{ const c = members.find(x=>x.id===id); if(c) addChildChip(c); });
-    if($('hasNonMemberChildren')) $('hasNonMemberChildren').checked = !!m.hasNonMemberChildren;
 
     for(const opt of $('ministries').options){ opt.selected = (m.ministries||[]).includes(opt.value); }
     if(m.photo){ $('photoPreview').src = m.photo; $('photoPreview').style.display='block'; }
@@ -1859,25 +1715,7 @@ async function saveFromModal(e){
   }
 
   try {
-    const spouse = findMemberByLabel(($('spouseInput').value||'').trim());
-    const childIds = currentChildrenIds();
     const selectedMins = Array.from($('ministries').selectedOptions).map(o=>o.value);
-
-    // Determine birthdate - prioritize full date picker, then MM-DD input
-    let birthDateValue = '';
-    if($('birthDate').value){
-      birthDateValue = $('birthDate').value; // YYYY-MM-DD format
-    } else if($('birthMonthDay').value){
-      // Validate MM-DD format
-      const monthDayInput = $('birthMonthDay').value.trim();
-      const mmddPattern = /^(0[1-9]|1[0-2])-(0[1-9]|[12][0-9]|3[01])$/;
-      if(mmddPattern.test(monthDayInput)){
-        birthDateValue = monthDayInput; // Store as MM-DD
-      } else if(monthDayInput){
-        showToast('Birthday must be in MM-DD format (e.g., 09-25)', 'warning');
-        return;
-      }
-    }
 
     const rec = {
       id: editingId || nextMemberId(),
@@ -1886,22 +1724,7 @@ async function saveFromModal(e){
       middle: $('middle').value.trim(),
       last: $('last').value.trim(),
       suffix: $('suffix').value.trim(),
-      phone: $('phone').value.trim(),
-      email: $('email').value.trim(),
-      address1: $('address1').value.trim(),
-      address2: $('address2').value.trim(),
-      city: $('city').value.trim(),
-      state: $('state').value,
-      zip: $('zip').value.trim(),
-      marital: $('marital').value,
-      gender: $('gender').value,
       status: ($('status')?.value || 'active'),
-      birthDate: birthDateValue,
-      joinDate: $('joinDate').value,
-      baptismDate: $('baptismDate').value,
-      spouseId: spouse ? spouse.id : "",
-      childrenIds: childIds,
-      hasNonMemberChildren: $('hasNonMemberChildren')?.checked || false,
       ministries: selectedMins,
       photo: ''
     };
@@ -1910,9 +1733,6 @@ async function saveFromModal(e){
     if (editingId) {
       const prev = members.find(x => x.id === editingId) || {};
       rec.photo = tempPhotoDataUrl || prev.photo || '';
-      rec.nonMemberSpouse = prev.nonMemberSpouse || '';
-      rec.nonMemberChildren = prev.nonMemberChildren || [];
-      if (!rec.hasNonMemberChildren) rec.hasNonMemberChildren = prev.hasNonMemberChildren || false;
 
       appendMemberActivity({
         action: 'member_updated',
@@ -1922,7 +1742,6 @@ async function saveFromModal(e){
 
       await idbPut('members', rec);
     } else {
-      // New member
       rec.photo = tempPhotoDataUrl || '';
 
       appendMemberActivity({
@@ -1934,29 +1753,6 @@ async function saveFromModal(e){
       await idbPut('members', rec);
     }
     // ✅ ACTIVITY LOGGING ENDS HERE
-
-    if (rec.spouseId) {
-      const sp = await idbGet('members', rec.spouseId);
-      if (sp) {
-        if (sp.spouseId !== rec.id) sp.spouseId = rec.id;
-        sp.childrenIds = [...new Set(childIds)];
-        await idbPut('members', sp);
-      }
-    } else {
-      for (const m of members) {
-        if (m.spouseId === rec.id) {
-          m.spouseId = "";
-          await idbPut('members', m);
-        }
-      }
-    }
-
-    for (const m of members) {
-      if (Array.isArray(m.childrenIds) && m.childrenIds.includes(rec.id) && !childIds.includes(m.id)) {
-        m.childrenIds = m.childrenIds.filter(cid => cid !== rec.id);
-        await idbPut('members', m);
-      }
-    }
 
     members = await idbGetAll('members');
     try {
@@ -1998,42 +1794,7 @@ if (manageMinistryModal) {
 /********** View / Delete / PDF **********/
 function viewCard(m) {
   currentViewMember = m;
-  const age = m.birthDate ? ageFromDOB(m.birthDate) : "";
-  const spouse = m.spouseId ? members.find(x => x.id === m.spouseId) : null;
-
-  const children = (m.childrenIds || [])
-    .map(id => members.find(c => c.id === id))
-    .filter(Boolean);
-
-  const hasChildren = children.length > 0;
-
-  // Conditional blocks
-  const spouseHtml = (m.marital === "Married" && spouse)
-    ? `<div><strong>Spouse:</strong> ${memberLabel(spouse)}</div>`
-    : (m.marital === "Married" && m.nonMemberSpouse)
-    ? `<div><strong>Spouse:</strong> ${escapeHtml(m.nonMemberSpouse)}</div>`
-    : "";
-
-
-  const nmKids = m.nonMemberChildren || [];
-  const allChildNames = [
-    ...children.map(c => memberLabel(c)),
-    ...nmKids.map(n => escapeHtml(n))
-  ];
-  if (m.hasNonMemberChildren && !nmKids.length && !children.length) allChildNames.push('(non-member)');
-  else if (m.hasNonMemberChildren && !nmKids.length && children.length) allChildNames.push('+ non-member');
-  const childrenHtml = allChildNames.length
-    ? `<div><strong>Children:</strong> ${allChildNames.join(", ")}</div>`
-    : "";
-
-  const joinHtml = m.joinDate
-    ? `<div><strong>Join Date:</strong> ${fmtMDY(m.joinDate)}</div>`
-    : "";
-
-  const baptHtml = m.baptismDate
-    ? `<div><strong>Baptism Date:</strong> ${fmtMDY(m.baptismDate)}</div>`
-    : "";
-
+  
   $('viewBody').innerHTML = `
     <div style="
       display:flex;
@@ -2062,21 +1823,8 @@ function viewCard(m) {
           ${memberLabel(m)}
         </div>
 
-        <div style="color:#555;margin:6px 0 12px;">
-          ${m.address1 || ''}<br>
-          ${(m.city || '')}${m.state ? ', ' + m.state : ''} ${m.zip || ''}
-          <br>
-          <br>
-        </div>
-
         <div style="margin-top:12px;font-size:15px;line-height:1.65">
           <div><strong>Gender:</strong> ${m.gender || ""}</div>
-
-          ${spouseHtml}
-          ${childrenHtml}
-
-          ${joinHtml}
-          ${baptHtml}
 
         </div>
 
@@ -2109,17 +1857,7 @@ async function deleteMember(id){
 if (!yes) return;
   
   const m = members.find(x => x.id === id);
-  const sp = members.find(x=>x.spouseId===id);
-  
-  if(sp){ sp.spouseId=''; await idbPut('members', sp); }
-  
-  for(const a of members){
-    if(Array.isArray(a.childrenIds) && a.childrenIds.includes(id)){
-      a.childrenIds = a.childrenIds.filter(cid=>cid!==id);
-      await idbPut('members', a);
-    }
-  }
-  
+
   // ✅ LOG DELETION
   appendMemberActivity({
     action: 'member_deleted',
@@ -2158,9 +1896,7 @@ function renderMembers(){
   let base = members.filter(m => (m.status || 'active') !== 'archived');
   let arr = base.filter(m =>
     !q ||
-    memberLabel(m).toLowerCase().includes(q) ||
-    (m.phone||'').toLowerCase().includes(q) ||
-    (m.email||'').toLowerCase().includes(q)
+    memberLabel(m).toLowerCase().includes(q)
   );
   // Apply filter dialog options
 arr = arr.filter(m => {
@@ -3008,29 +2744,6 @@ if (!yes) return;
   renderCalendar();
 }
 
-function getBirthdayDisplay(member) {
-  if (!member.birthDate) return '';
-  const parts = member.birthDate.split('-');
-  
-  let month, day;
-  
-  if (parts.length === 2) {
-    // Already MM-DD format
-    [month, day] = parts.map(Number);
-  } else if (parts.length === 3) {
-    // YYYY-MM-DD format
-    [, month, day] = parts.map(Number);
-  } else {
-    return member.birthDate;
-  }
-  
-  // Convert to month name
-  const monthNames = ['January', 'February', 'March', 'April', 'May', 'June',
-                      'July', 'August', 'September', 'October', 'November', 'December'];
-  
-  return `${monthNames[month - 1]} ${day}`;
-}
-
 function shiftCalendarMonth(delta) {
   const el = $('calMonth');
 
@@ -3065,8 +2778,8 @@ $('printMonthlyCalendarBtn').addEventListener('click', () => {
   
   // Get calendar data
   const activeTypes = Array.from(document.querySelectorAll('.calToggle:checked')).map(cb => cb.dataset.cal);
-  const fieldMap = { birth: 'birthDate', join: 'joinDate', baptism: 'baptismDate' };
-  const labelMap = { birth: 'Birthday', join: 'Join', baptism: 'Baptism', event: 'Event' };
+  const fieldMap = {};
+  const labelMap = { event: 'Event' };
   const calMembers = getCalendarMembers();
   
   // Calculate calendar dimensions
@@ -3224,8 +2937,8 @@ $('printYearlyCalendarBtn').addEventListener('click', () => {
     return;
   }
   
-  const fieldMap = { birth: 'birthDate', join: 'joinDate', baptism: 'baptismDate' };
-  const labelMap = { birth: 'Birthday', join: 'Join', baptism: 'Baptism', event: 'Event' };
+  const fieldMap = {};
+  const labelMap = { event: 'Event' };
   const calMembers = getCalendarMembers();
   const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
   
@@ -3422,8 +3135,8 @@ dayNames.forEach(day => {
   }
 
   // Maps
-  const fieldMap = { birth: 'birthDate', join: 'joinDate', baptism: 'baptismDate' };
-  const labelMap = { birth: 'Birthday', join: 'Join Date', baptism: 'Baptism Date', event: 'Event' };
+  const fieldMap = {};
+  const labelMap = { event: 'Event' };
 
   // Blank squares
   for (let i = 0; i < firstWeekday; i++) {
@@ -5750,7 +5463,7 @@ $('musicPrevWeekBtn')?.addEventListener('click', async () => { musicWeekOffset--
       <div class="row two">
         <div>
           <label>Status</label>
-          <select id="fltStatus">
+          <select id="filterStatus">
 			<option value="">All</option>
 			<option value="active">Active</option>
 			<option value="inactive">Inactive</option>
@@ -5765,25 +5478,6 @@ $('musicPrevWeekBtn')?.addEventListener('click', async () => { musicWeekOffset--
             <option value="Male">Male</option>
             <option value="Female">Female</option>
           </select>
-        </div>
-      </div>
-
-      <div class="row two">
-        <div>
-          <label>Marital Status</label>
-          <select id="filterMarital">
-            <option value="">Any</option>
-            <option value="Single">Single</option>
-            <option value="Married">Married</option>
-          </select>
-        </div>
-
-        <div>
-          <label>Age (min / max)</label>
-          <div style="display:flex;gap:6px">
-            <input id="filterAgeMin" type="number" placeholder="Min">
-            <input id="filterAgeMax" type="number" placeholder="Max">
-          </div>
         </div>
       </div>
 
