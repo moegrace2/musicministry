@@ -369,6 +369,24 @@ body.maintenance .toolbar-row.edit-only{display:flex;}
     padding: 2px 0;
     text-align: center;
   }
+  /* Song History table - hide Group column, shrink text */
+  #historyTableWrap table,
+  #bySongWrap table { font-size: 11px; }
+  
+  #historyTableWrap th:nth-child(5),
+  #historyTableWrap td:nth-child(5),
+  #bySongWrap th:nth-child(5),
+  #bySongWrap td:nth-child(5) { display: none; }
+
+  #historyTableWrap th,
+  #historyTableWrap td,
+  #bySongWrap th,
+  #bySongWrap td { padding: 6px 4px; }
+
+  /* Song history filters - stack on mobile */
+  #songHistoryView .toolbar-row { flex-direction: column; gap: 8px; }
+  #songHistoryView .toolbar-row > * { width: 100%; }
+
   /* Compact toolbar on mobile */
   .toolbar-row {
     flex-wrap: wrap;
