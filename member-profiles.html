@@ -3694,7 +3694,7 @@ let musicWeekOffset = 0; // weeks from current week
 
 async function loadMusicData() {
   if (!idb) idb = await idbOpen();
-  if (IS_ELECTRON)  songs = await idbGetAll('songs');
+  songs = await idbGetAll('songs');
   musicSched = await idbGetAll('musicSched');
 }
 
