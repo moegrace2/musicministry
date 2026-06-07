@@ -341,10 +341,32 @@ body.maintenance .toolbar-row.edit-only{display:flex;}
   .toolbar-row .btn { flex: 1; min-width: 80px; }
   .calMonthNav { width: 100%; justify-content: center; }
   #calendarMonthGrid { 
-    grid-template-columns: repeat(7, minmax(40px, 1fr));
-    gap: 4px;
-    overflow-x: auto;
-    font-size: 11px;
+    display: block;
+    column-count: unset;
+    font-size: 13px;
+  }
+  #calendarMonthGrid .cal-day {
+    width: 100%;
+    box-sizing: border-box;
+    min-height: unset;
+    padding: 6px 10px;
+    margin-bottom: 4px;
+    flex-direction: row;
+    gap: 10px;
+    align-items: flex-start;
+  }
+  #calendarMonthGrid .cal-day strong {
+    min-width: 28px;
+    font-size: 13px;
+    margin-bottom: 0;
+    padding-top: 2px;
+  }
+  #calendarMonthGrid .cal-day.muted {
+    display: none;
+  }
+  /* Hide the day-of-week header row on mobile */
+  #calendarMonthGrid .cal-header {
+    display: none;
   }
 
   /* Hide sidebar, show bottom nav */
