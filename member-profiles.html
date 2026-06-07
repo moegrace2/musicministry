@@ -3397,7 +3397,7 @@ $('printEventListBtn').addEventListener('click', async () => {
   const doc = new jsPDF({unit:'pt', format:'letter'});
   
   const list = (calendarEvents || [])
-    .filter(ev => ev && ev.date && ev.title && ev.type !== 'service')
+    .filter(ev => ev && ev.date && ev.title && ev.type === 'event')
     .filter(ev => !range.from || ev.date >= range.from)
     .filter(ev => !range.to || ev.date <= range.to)
     .slice()
