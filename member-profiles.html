@@ -5080,15 +5080,15 @@ function _renderSongHistory() {
       if (!slot.songTitle) return;
       const song = songs.find(s => s.id === slot.songId);
       const group = song ? (song.type || 'choir') : '';
-      const today = new Date().toLocaleDateString('en-CA');
-      if (sched.date > today) return;
-      if (from && sched.date < from) return;
-      if (to && sched.date > to) return;
-      const liveSong = songs.find(s => s.id === slot.songId);
+const today = new Date().toLocaleDateString('en-CA');
+if (sched.date > today) return;
+if (from && sched.date < from) return;
+if (to && sched.date > to) return;
+const liveSong = songs.find(s => s.id === slot.songId);
 	  const resolvedLeader = liveSong?.leaderName || slot.leader || '';
 	  if (leaderFilter && resolvedLeader !== leaderFilter) return;
       if (groupFilter && group !== groupFilter) return;
-      rows.push({ date: sched.date, serviceType: sched.serviceType, timeOfDay: sched.timeOfDay, slot, group });
+      rows.push({ date: sched.date, serviceType: sched.serviceType, timeOfDay: sched.timeOfDay, slot, group, nightGroup: sched.nightGroupOverride || '' });
     });
   });
 
@@ -5115,7 +5115,9 @@ function _renderSongHistory() {
 			const tod = r.serviceType.includes('morning') ? 'Morning' : (r.timeOfDay === 'afternoon' ? 'Afternoon' : 'Night');
 			return ev ? `${ev.title} — ${tod}` : (r.serviceType.includes('morning') ? 'Sunday Morning' : 'Sunday Night');
 		  }
-		  return r.serviceType.includes('morning') ? 'Sunday Morning' : 'Sunday Night';
+		  if (r.serviceType.includes('morning')) return 'Sunday Morning';
+const grp = r.nightGroup ? ` — ${r.nightGroup}` : '';
+return `Sunday Night${grp}`;
 		})()}</td>
       <td style="padding:10px">${r.slot.songTitle}</td>
       <td style="padding:10px">${(songs.find(s => s.id === r.slot.songId)?.leaderName) || r.slot.leader || '—'}</td>
@@ -5223,23 +5225,20 @@ async function getRosters() {
     return JSON.parse(localStorage.getItem('choirRosters') || '{"section1":[],"section2":[]}');
   } catch { return { section1: [], section2: [] }; }
 }
-function saveRosters(rosters) {
+async function saveRosters(rosters) {
   localStorage.setItem('choirRosters', JSON.stringify(rosters));
-  Object.entries(rosters).forEach(([id, members]) => {
-    idbPut('rosters', { id, members });
-  });
+  await Promise.all(Object.entries(rosters).map(([id, members]) =>
+    idbPut('rosters', { id, members })
+  ));
 }
-
 async function renderRosters() {
   const rosters = await getRosters();
   const choirMembers = (members || []).filter(m => (m.ministries || []).some(min => min.toLowerCase() === 'choir'));
-
   function renderSection(listId, selectId, sectionKey) {
     const listEl = $(listId);
     const selectEl = $(selectId);
     const assigned = rosters[sectionKey] || [];
     listEl.innerHTML = '';
-
     assigned.forEach(id => {
       const m = members.find(x => x.id === id);
       if (!m) return;
@@ -5249,12 +5248,11 @@ async function renderRosters() {
       row.querySelector('button').addEventListener('click', async e => {
         const r = await getRosters();
         r[sectionKey] = r[sectionKey].filter(x => x !== e.target.dataset.id);
-        saveRosters(r);
+        await saveRosters(r);
         renderRosters();
       });
       listEl.appendChild(row);
     });
-
     // Populate add dropdown with choir members not already in this section
     selectEl.innerHTML = '<option value="">— Select member —</option>';
     choirMembers.filter(m => !assigned.includes(m.id)).sort(byNameAsc).forEach(m => {
@@ -5264,18 +5262,16 @@ async function renderRosters() {
       selectEl.appendChild(opt);
     });
   }
-
   renderSection('section1RosterList', 'section1AddSelect', 'section1');
   renderSection('section2RosterList', 'section2AddSelect', 'section2');
 }
-
 async function addToSection(sectionKey) {
   const selectId = sectionKey === 'section1' ? 'section1AddSelect' : 'section2AddSelect';
   const id = $(selectId).value;
   if (!id) return;
   const rosters = await getRosters();
   if (!rosters[sectionKey].includes(id)) rosters[sectionKey].push(id);
-  saveRosters(rosters);
+  await saveRosters(rosters);
   renderRosters();
 }
 
