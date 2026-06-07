@@ -361,11 +361,15 @@ body.maintenance .toolbar-row.edit-only{display:flex;}
     margin-bottom: 0;
     padding-top: 2px;
   }
-  #calendarMonthGrid .cal-day.muted {
+  #	#calendarMonthGrid .cal-day.muted {
     display: none;
   }
-  /* Hide the day-of-week header row on mobile */
-  #calendarMonthGrid .cal-header {
+  /* Hide day-of-week headers on mobile - they are the first 7 divs without cal-day class */
+  #calendarMonthGrid div:not(.cal-day) {
+    display: none;
+  }
+  /* Hide empty days (only have a strong number child, no events) */
+  #calendarMonthGrid .cal-day:not(:has(.event)) {
     display: none;
   }
 
