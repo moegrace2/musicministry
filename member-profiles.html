@@ -5058,6 +5058,7 @@ function _renderSongLibrary() {
 
 async function renderSongHistory() {
   await loadMusicData();
+  await loadCalendarEvents();
   _renderSongHistory();
 }
 
@@ -5111,13 +5112,13 @@ const liveSong = songs.find(s => s.id === slot.songId);
       <td style="padding:10px">${fmtLongDate(r.date)}</td>
       <td style="padding:10px">${(() => {
 		  if (r.serviceType.includes('special')) {
-			const ev = (specialEvents || []).find(e => e.date === r.date);
+			const ev = (specialEvents || []).find(e => e.date === r.date || (e.endDate && r.date >= e.date && r.date <= e.endDate));
 			const tod = r.serviceType.includes('morning') ? 'Morning' : (r.timeOfDay === 'afternoon' ? 'Afternoon' : 'Night');
 			return ev ? `${ev.title} — ${tod}` : (r.serviceType.includes('morning') ? 'Sunday Morning' : 'Sunday Night');
 		  }
 		  if (r.serviceType.includes('morning')) return 'Sunday Morning';
-const grp = r.nightGroup ? ` — ${r.nightGroup}` : '';
-return `Sunday Night${grp}`;
+		  const grp = r.nightGroup ? ` — ${r.nightGroup}` : '';
+		  return `Sunday Night${grp}`;
 		})()}</td>
       <td style="padding:10px">${r.slot.songTitle}</td>
       <td style="padding:10px">${(songs.find(s => s.id === r.slot.songId)?.leaderName) || r.slot.leader || '—'}</td>
