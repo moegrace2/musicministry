@@ -340,7 +340,12 @@ body.maintenance .toolbar-row.edit-only{display:flex;}
   .toolbar-row { flex-wrap: wrap; gap: 8px; }
   .toolbar-row .btn { flex: 1; min-width: 80px; }
   .calMonthNav { width: 100%; justify-content: center; }
-  #calendarMonthGrid { overflow-x: auto; }
+  #calendarMonthGrid { 
+    grid-template-columns: repeat(7, minmax(40px, 1fr));
+    gap: 4px;
+    overflow-x: auto;
+    font-size: 11px;
+  }
 
   /* Hide sidebar, show bottom nav */
   aside { display: none; }
@@ -5811,6 +5816,9 @@ $('musicPrevWeekBtn')?.addEventListener('click', async () => { musicWeekOffset--
   </button>
   <button data-view="songLibraryView">
     <span class="icon">🎶</span>Songs
+  </button>
+  <button data-view="songHistoryView">
+    <span class="icon">📖</span>History
   </button>
   <button data-view="calendarView">
     <span class="icon">📅</span>Calendar
