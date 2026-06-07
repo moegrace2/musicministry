@@ -1099,35 +1099,25 @@ window.__AUTH_CHECK_READY__ = false;
 
 // ═══════════════════════════════════════════════════════
 // SUPABASE INTEGRATION
-// Credentials are stored in localStorage (never in code).
-// On first run, a setup screen prompts for URL + key.
 // ═══════════════════════════════════════════════════════
 
-const SB_URL_KEY  = 'church_sb_url';
-const SB_KEY_KEY  = 'church_sb_key';
-
-function getSbCreds() {
-  return {
-    url: localStorage.getItem(SB_URL_KEY) || '',
-    key: localStorage.getItem(SB_KEY_KEY) || '',
-  };
-}
+const SB_URL = 'https://grrjeibruneeuyyeyqgr.supabase.co;
+const SB_ANON_KEY = 'sb_publishable_61qyWT70c4yDFH4GXHr5VQ_a0jwXPO2';
 
 function sbReady() {
-  const { url, key } = getSbCreds();
-  return !!(url && key && window._sbClient);
+  return !!(window._sbClient && window._sbSession);
 }
 
 async function initSupabase() {
-  const { url, key } = getSbCreds();
-  if (!url || !key) return false;
   try {
     if (!window.supabase) throw new Error('Supabase library not loaded');
-    window._sbClient = window.supabase.createClient(url, key);
-    // Test the connection
-    const { error } = await window._sbClient.from('members').select('id').limit(1);
-    if (error) throw error;
-    return true;
+    window._sbClient = window.supabase.createClient(SB_URL, SB_ANON_KEY);
+    const { data: { session } } = await window._sbClient.auth.getSession();
+    if (session) {
+      window._sbSession = session;
+      return true;
+    }
+    return false;
   } catch(e) {
     console.warn('Supabase init failed:', e);
     return false;
@@ -1269,50 +1259,51 @@ function showSetupScreen() {
       <div style="background:#fff;border-radius:16px;padding:40px;max-width:480px;width:90%;box-shadow:0 8px 40px rgba(0,0,0,.12)">
         <div style="text-align:center;margin-bottom:28px">
           <div style="font-size:32px;margin-bottom:8px">⛪</div>
-          <h2 style="margin:0 0 6px;font-size:22px">Church App Setup</h2>
-          <p style="margin:0;color:#666;font-size:14px">Enter your Supabase credentials to get started.<br>You'll only need to do this once per device.</p>
+          <h2 style="margin:0 0 6px;font-size:22px">Living Word Church</h2>
+          <p style="margin:0;color:#666;font-size:14px">Sign in to continue</p>
         </div>
         <div style="margin-bottom:16px">
-          <label style="display:block;font-weight:600;margin-bottom:6px;font-size:14px">Supabase Project URL</label>
-          <input id="sbUrlInput" type="text" placeholder="https://xxxxxxxxxxxx.supabase.co"
+          <label style="display:block;font-weight:600;margin-bottom:6px;font-size:14px">Email</label>
+          <input id="sbEmailInput" type="email" placeholder="you@example.com" autocomplete="email"
             style="width:100%;padding:10px 12px;border:1px solid #ddd;border-radius:8px;font-size:14px;box-sizing:border-box"/>
         </div>
         <div style="margin-bottom:24px">
-          <label style="display:block;font-weight:600;margin-bottom:6px;font-size:14px">Supabase Anon Key</label>
-          <input id="sbKeyInput" type="password" placeholder="eyJ..."
+          <label style="display:block;font-weight:600;margin-bottom:6px;font-size:14px">Password</label>
+          <input id="sbPasswordInput" type="password" placeholder="••••••••" autocomplete="current-password"
             style="width:100%;padding:10px 12px;border:1px solid #ddd;border-radius:8px;font-size:14px;box-sizing:border-box"/>
-          <div style="margin-top:6px;font-size:12px;color:#888">Found in Supabase → Settings → Data API</div>
         </div>
-        <button id="sbSaveBtn" style="width:100%;padding:12px;background:#1f4aa8;color:#fff;border:none;border-radius:8px;font-size:15px;font-weight:600;cursor:pointer">
-          Connect &amp; Continue
+        <button id="sbLoginBtn" style="width:100%;padding:12px;background:#1f4aa8;color:#fff;border:none;border-radius:8px;font-size:15px;font-weight:600;cursor:pointer">
+          Sign In
         </button>
         <div id="sbSetupError" style="margin-top:12px;color:#dc2626;font-size:13px;text-align:center;display:none"></div>
-        <div style="margin-top:16px;text-align:center">
-          <button id="sbSkipBtn" style="background:none;border:none;color:#888;font-size:13px;cursor:pointer;text-decoration:underline">
-            Use offline only (data stays on this device)
-          </button>
-        </div>
       </div>
     `;
     document.body.appendChild(overlay);
 
-    document.getElementById('sbSaveBtn').onclick = async () => {
-      const url = document.getElementById('sbUrlInput').value.trim();
-      const key = document.getElementById('sbKeyInput').value.trim();
+    document.getElementById('sbLoginBtn').onclick = async () => {
+      const email = document.getElementById('sbEmailInput').value.trim();
+      const password = document.getElementById('sbPasswordInput').value;
       const errEl = document.getElementById('sbSetupError');
-      if (!url || !key) { errEl.textContent = 'Both fields are required.'; errEl.style.display='block'; return; }
-      localStorage.setItem(SB_URL_KEY, url);
-      localStorage.setItem(SB_KEY_KEY, key);
-      const ok = await initSupabase();
-      if (!ok) { errEl.textContent = 'Could not connect. Check your credentials and try again.'; errEl.style.display='block'; localStorage.removeItem(SB_URL_KEY); localStorage.removeItem(SB_KEY_KEY); return; }
-      overlay.remove();
-      resolve(true);
+      if (!email || !password) { errEl.textContent = 'Both fields are required.'; errEl.style.display='block'; return; }
+      const btn = document.getElementById('sbLoginBtn');
+      btn.textContent = 'Signing in...'; btn.disabled = true;
+      try {
+        const { data, error } = await window._sbClient.auth.signInWithPassword({ email, password });
+        if (error) throw error;
+        window._sbSession = data.session;
+        overlay.remove();
+        resolve(true);
+      } catch(e) {
+        errEl.textContent = e.message || 'Sign in failed. Check your email and password.';
+        errEl.style.display = 'block';
+        btn.textContent = 'Sign In'; btn.disabled = false;
+      }
     };
 
-    document.getElementById('sbSkipBtn').onclick = () => {
-      overlay.remove();
-      resolve(false);
-    };
+    // Allow Enter key to submit
+    overlay.addEventListener('keydown', e => {
+      if (e.key === 'Enter') document.getElementById('sbLoginBtn').click();
+    });
   });
 }
 
@@ -1659,11 +1650,10 @@ applyFilterBtn.addEventListener('click', (e) => {
   const sbSettingsBtn = $('sbSettingsBtn');
   if (sbSettingsBtn) {
     sbSettingsBtn.addEventListener('click', async () => {
-      localStorage.removeItem(SB_URL_KEY);
-      localStorage.removeItem(SB_KEY_KEY);
-      window._sbClient = null;
+      await window._sbClient.auth.signOut();
+      window._sbSession = null;
       await showSetupScreen();
-      if (sbReady()) showToast('Connected to Supabase!', 'success');
+      if (sbReady()) showToast('Signed in!', 'success');
     });
   }
   if (cancelModal) cancelModal.addEventListener('click', () => $('memberModal').close());
@@ -3660,10 +3650,8 @@ async function boot(){
   try { updateMaintenanceUI(); } catch(_) {}
 
   // Initialize Supabase if credentials exist, otherwise show setup screen
-  const { url, key } = getSbCreds();
-  if (url && key) {
-    await initSupabase();
-  } else {
+await initSupabase();
+  if (!sbReady()) {
     await showSetupScreen();
   }
 
