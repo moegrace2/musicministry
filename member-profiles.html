@@ -544,7 +544,7 @@ body.maintenance .toolbar-row.edit-only{display:flex;}
     <!-- Rehearsal Notes -->
     <div class="card" style="padding:18px">
       <strong style="font-size:15px;display:block;margin-bottom:10px">📝 Rehearsal Notes</strong>
-      <textarea id="rehearsalNotes" rows="5" placeholder="Announcements, prayer requests, attendance notes…" style="width:100%;resize:vertical" oninput="const g=$('rehearsalGroup')?.value||'choir'; localStorage.setItem('lw_rehearsal_notes_'+g, this.value); idbPut('rehearsalNotes', { key: 'notes_'+g, value: this.value });"></textarea>
+      <textarea id="rehearsalNotes" rows="5" placeholder="Announcements, prayer requests, attendance notes…" style="width:100%;resize:vertical" oninput="const g=$('rehearsalGroup')?.value||'choir'; localStorage.setItem('lw_rehearsal_notes_'+g, this.value); idbPut('rehearsalNotes', { id: 'notes_'+g, key: 'notes_'+g, value: this.value });"></textarea>
     </div>
   </div>
 
@@ -3891,11 +3891,11 @@ async function importMusicData(file) {
     }
     if (payload.rehearsalNotes) {
       localStorage.setItem('lw_rehearsal_notes_choir', payload.rehearsalNotes);
-      idbPut('rehearsalNotes', { key: 'notes_choir', value: payload.rehearsalNotes });
+      idbPut('rehearsalNotes', { id: 'notes_choir', key: 'notes_choir', value: payload.rehearsalNotes });
     }
     if (payload.rehearsalNotesPraise) {
       localStorage.setItem('lw_rehearsal_notes_praise', payload.rehearsalNotesPraise);
-      idbPut('rehearsalNotes', { key: 'notes_praise', value: payload.rehearsalNotesPraise });
+      idbPut('rehearsalNotes', { id: 'notes_praise', key: 'notes_praise', value: payload.rehearsalNotesPraise });
     }
     const notesEl = $('rehearsalNotes');
     if (notesEl) { delete notesEl.dataset.loadedGroup; }
@@ -4526,7 +4526,7 @@ async function getWorkingSongs() {
 }
 function saveWorkingSongs(arr) {
   localStorage.setItem(REHEARSAL_WORKING_KEY, JSON.stringify(arr));
-  idbPut('rehearsalNotes', { key: 'workingSongs', value: JSON.stringify(arr) });
+  idbPut('rehearsalNotes', { id: 'workingSongs', key: 'workingSongs', value: JSON.stringify(arr) });
 }
 
 function getNextSunday(fromDate) {
