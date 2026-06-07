@@ -332,6 +332,16 @@ body.maintenance .toolbar-row.edit-only{display:flex;}
 /* Prevent horizontal scroll */
   html { overflow-x: hidden; }
 
+  /* Ministries - stack panes vertically and full width */
+  .ministry-layout { flex-direction: column !important; }
+  .pane.left-pane, .pane.right-pane { width: 100% !important; flex-shrink: unset !important; }
+
+  /* Calendar toolbar - wrap and stack */
+  .toolbar-row { flex-wrap: wrap; gap: 8px; }
+  .toolbar-row .btn { flex: 1; min-width: 80px; }
+  .calMonthNav { width: 100%; justify-content: center; }
+  #calendarMonthGrid { overflow-x: auto; }
+
   /* Hide sidebar, show bottom nav */
   aside { display: none; }
   .layout { grid-template-columns: 1fr; min-height: 100vh; }
