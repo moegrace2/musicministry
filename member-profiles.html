@@ -346,25 +346,53 @@ body.maintenance .toolbar-row.edit-only{display:flex;}
     font-size: 9px;
   }
   #calendarMonthGrid .cal-day {
-    min-height: 44px;
-    padding: 3px;
+    min-height: 52px;
+    padding: 3px 2px;
     font-size: 9px;
+    word-break: break-word;
   }
   #calendarMonthGrid .cal-day strong {
     font-size: 10px;
     margin-bottom: 2px;
+    display: block;
   }
   #calendarMonthGrid .cal-day .event {
     font-size: 8px;
-    padding: 1px 3px;
+    padding: 1px 2px;
     margin: 1px 0;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
+    white-space: normal;
+    word-break: break-word;
+    line-height: 1.2;
   }
   #calendarMonthGrid div:not(.cal-day) {
-    font-size: 9px;
-    padding: 3px 0;
+    font-size: 8px;
+    padding: 2px 0;
+    text-align: center;
+  }
+  /* Compact toolbar on mobile */
+  .toolbar-row {
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+  #calPrevMonthBtn, #calNextMonthBtn {
+    padding: 4px 8px;
+    font-size: 16px;
+    min-height: 32px;
+  }
+  #calMonth {
+    font-size: 12px;
+    padding: 4px;
+    width: 120px;
+  }
+  #calGridBtn, #addEventBtn {
+    font-size: 12px;
+    padding: 6px 10px;
+    min-height: 32px;
+  }
+  #calendarPrintBtn {
+    font-size: 12px;
+    padding: 6px 10px;
+    min-height: 32px;
   }
 
   /* Hide sidebar, show bottom nav */
