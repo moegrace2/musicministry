@@ -326,6 +326,63 @@ body.maintenance .toolbar-row.edit-only{display:flex;}
 .pdf-modal-body{padding:0; flex:1 1 auto; min-height:0;}
 .pdf-modal-body iframe{width:100%; height:100%; border:0; display:block;}
 
+/* ── MOBILE ─────────────────────────────────────── */
+@media (max-width: 768px) {
+
+  /* Hide sidebar, show bottom nav */
+  aside { display: none; }
+  .layout { grid-template-columns: 1fr; min-height: 100vh; }
+  main { padding-bottom: 70px; } /* room for bottom nav */
+
+  /* Bottom tab bar */
+  #mobileNav {
+    display: flex;
+    position: fixed;
+    bottom: 0; left: 0; right: 0;
+    background: #fff;
+    border-top: 1px solid var(--border);
+    box-shadow: 0 -2px 10px rgba(0,0,0,.08);
+    z-index: 1000;
+    height: 60px;
+  }
+  #mobileNav button {
+    flex: 1;
+    border: none;
+    background: none;
+    font-size: 10px;
+    color: #94a3b8;
+    cursor: pointer;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 3px;
+    padding: 6px 2px;
+    transition: color .15s;
+  }
+  #mobileNav button .icon { font-size: 20px; line-height: 1; }
+  #mobileNav button.active { color: #1f4aa8; }
+
+  /* Music sub-tabs scroll horizontally */
+  .musicTabs { overflow-x: auto; white-space: nowrap; padding-bottom: 4px; }
+  .musicTabs::-webkit-scrollbar { display: none; }
+
+  /* Bigger touch targets */
+  .nav button, .btn { min-height: 44px; }
+
+  /* Section padding */
+  main > section { padding: 12px; }
+
+  /* Cards full width */
+  .cards { grid-template-columns: 1fr !important; }
+
+  /* Tables scroll horizontally */
+  .table-wrap { overflow-x: auto; }
+  table.list { min-width: 500px; }
+}
+
+/* Hide bottom nav on desktop */
+#mobileNav { display: none; }
 
 </style>
 </head>
@@ -1503,6 +1560,7 @@ document.addEventListener('click', (e) => {
   }
 });
 /********** Nav + header toggles **********/
+/********** Nav + header toggles **********/
 document.querySelectorAll('.nav button').forEach(btn=>{
   btn.addEventListener('click', ()=>{
     document.querySelectorAll('.nav button').forEach(b=>b.classList.remove('active'));
@@ -1529,6 +1587,34 @@ document.querySelectorAll('.nav button').forEach(btn=>{
     if(to==='songLibraryView') renderSongLibrary();
     if(to==='songHistoryView') renderSongHistory();
     if(to==='calendarView') renderCalendar();
+  });
+});
+
+// Mobile bottom nav
+document.querySelectorAll('#mobileNav button').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('#mobileNav button').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    const to = btn.dataset.view;
+    // Sync sidebar nav active state
+    document.querySelectorAll('.nav button').forEach(b => {
+      b.classList.toggle('active', b.dataset.view === to);
+    });
+    const memberSearchEl = $('search');
+    if (memberSearchEl) memberSearchEl.value = '';
+    const manageMinBtn = $('manageMinHeaderBtn');
+    if (manageMinBtn) manageMinBtn.style.display = (to === 'ministriesUnified') ? '' : 'none';
+    for (const sec of ['membersView','ministriesUnified','musicView','songLibraryView','songHistoryView','calendarView']) {
+      const el = $(sec);
+      if (el) el.style.display = (sec === to) ? 'block' : 'none';
+    }
+    if(to==='membersView') renderMembers();
+    if(to==='ministriesUnified') { loadMinistryManager(); renderRosters(); }
+    if(to==='musicView') renderMusicMinistry();
+    if(to==='songLibraryView') renderSongLibrary();
+    if(to==='songHistoryView') renderSongHistory();
+    if(to==='calendarView') renderCalendar();
+    window.scrollTo(0, 0);
   });
 });
 
@@ -5696,5 +5782,22 @@ $('musicPrevWeekBtn')?.addEventListener('click', async () => { musicWeekOffset--
   </div>
 </dialog>
 
+<nav id="mobileNav">
+  <button class="active" data-view="membersView">
+    <span class="icon">👥</span>Members
+  </button>
+  <button data-view="ministriesUnified">
+    <span class="icon">✝️</span>Ministries
+  </button>
+  <button data-view="musicView">
+    <span class="icon">🎵</span>Schedule
+  </button>
+  <button data-view="songLibraryView">
+    <span class="icon">🎶</span>Songs
+  </button>
+  <button data-view="calendarView">
+    <span class="icon">📅</span>Calendar
+  </button>
+</nav>
 </body>
 </html>
