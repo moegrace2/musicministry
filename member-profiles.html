@@ -3874,8 +3874,19 @@ async function importMusicData(file) {
     if (!yes) return;
 
     for (const song of (payload.songs || [])) {
-      await idbPut('songs', song);
-    }
+	  // Remap leaderId by matching leaderName to current members
+	  if (song.leaderName && song.leaderName !== 'N/A') {
+		const match = members.find(m => memberLabel(m) === song.leaderName);
+		if (match) song.leaderId = match.id;
+		else song.leaderId = '';
+	  }
+	  if (song.leader2Name && song.leader2Name !== 'N/A') {
+		const match = members.find(m => memberLabel(m) === song.leader2Name);
+		if (match) song.leader2Id = match.id;
+		else song.leader2Id = '';
+	  }
+	  await idbPut('songs', song);
+	}
     for (const sched of (payload.musicSched || [])) {
       await idbPut('musicSched', sched);
     }
