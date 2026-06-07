@@ -2,18 +2,17 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self' https://*.supabase.co https://cdn.jsdelivr.net; frame-src 'self' blob:; object-src 'none'; base-uri 'none';" />
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self' https://*.supabase.co https://cdn.jsdelivr.net https://cdnjs.cloudflare.com; frame-src 'self' blob:; object-src 'none'; base-uri 'none';" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>The Living Word – Music Ministry</title>
 
-  <!-- Vendor libs -->
-  <script src="./vendor/html2canvas.min.js"></script>
-  <script src="./vendor/jspdf.umd.min.js"></script>
-  <script src="./vendor/jspdf.plugin.autotable.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+  <!-- Vendor libs (CDN) -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 
-<script src="confirm-dialog.js"></script>
-<script src="notifications.js"></script>
+<!-- confirm-dialog.js and notifications.js are now inlined below -->
 
   <style>
     :root{
@@ -184,9 +183,8 @@
   box-shadow:var(--shadow-lg);
 
   /* ↓ MAKE MEMBER PROFILE POPUP NARROW ↓ */
-  max-width:600px;
-  width:95%;
-  overflow-x:hidden;
+  max-width:700px;
+  width:90%;
 
   padding:0;
 }
@@ -327,7 +325,6 @@ body.maintenance .toolbar-row.edit-only{display:flex;}
 .pdf-modal-actions .btn{padding:8px 12px;border-radius:10px;}
 .pdf-modal-body{padding:0; flex:1 1 auto; min-height:0;}
 .pdf-modal-body iframe{width:100%; height:100%; border:0; display:block;}
-
 
 
 </style>
@@ -828,7 +825,7 @@ body.maintenance .toolbar-row.edit-only{display:flex;}
       </div>
       <div class="modal-body">
         <!-- Row 1: Title / First / Last / Suffix -->
-        <div class="row" style="display:grid;grid-template-columns:90px 1fr 1fr 60px;gap:6px;margin-bottom:12px">
+        <div class="row" style="display:grid;grid-template-columns:100px 1fr 1fr 70px;gap:8px;margin-bottom:12px">
           <div><label>Title</label><select id="title"><option value=""></option><option>Sis.</option><option>Bro.</option><option>Bishop</option><option>Elder</option><option>Minister</option><option>Deacon</option></select></div>
           <div><label>First Name</label><input id="first" type="text" required/></div>
           <div><label>Last Name</label><input id="last" type="text" required/></div>
@@ -943,200 +940,7 @@ function escapeHtml(s){
     .replace(/'/g,'&#39;');
 }
 
-function computeFamiliesFromMembers(memberList){
-  const arr = Array.isArray(memberList) ? memberList : [];
-  const map = new Map();
-  const famKey = (m) => {
-    const ln = String(m.lastName || m.lname || '').trim().toLowerCase();
-    const addr = String(m.address || m.address1 || m.street || '').trim().toLowerCase();
-    const city = String(m.city || '').trim().toLowerCase();
-    return `${ln}__${addr}__${city}` || String(m.id||Math.random());
-  };
-
-  for (const m of arr){
-    const k = famKey(m);
-    if (!map.has(k)) map.set(k, { name:'', addressLine:'', cityStateZip:'', phone:'', members:[] });
-    const f = map.get(k);
-
-    const full = `${m.firstName||m.fname||''} ${m.lastName||m.lname||''}`.trim();
-    const label = full || String(m.name||'').trim() || 'Member';
-    f.members.push(label);
-
-    const addr = String(m.address || m.address1 || m.street || '').trim();
-    const city = String(m.city || '').trim();
-    const st = String(m.state || '').trim();
-    const zip = String(m.zip || '').trim();
-    if (!f.addressLine && addr) f.addressLine = addr;
-    if (!f.cityStateZip && (city||st||zip)) f.cityStateZip = [city, st, zip].filter(Boolean).join(', ').replace(', ,', ',');
-
-    const ph = String(m.phone || m.phone1 || m.mobile || '').trim();
-    if (!f.phone && ph) f.phone = ph;
-
-    if (!f.name){
-      const ln = String(m.lastName || m.lname || '').trim();
-      f.name = ln ? `${ln} Family` : label;
-    }
-  }
-
-  const out = Array.from(map.values()).map(f => ({...f, members: Array.from(new Set(f.members))}));
-  out.sort((a,b)=> String(a.name||'').localeCompare(String(b.name||'')));
-  return out;
-}
-
-function buildBirthdayListFromMembers(memberList){
-  const arr = Array.isArray(memberList) ? memberList : [];
-  const list = [];
-  for (const m of arr){
-    const b = m.birthDate || m.birthday || m.birthdate || m.dob || '';
-    let mm=null, dd=null, yy=null;
-
-    if (typeof b === 'string' && b.includes('-')){
-      const p=b.split('-'); 
-      if (p.length>=3){ 
-        yy=Number(p[0]); 
-        mm=Number(p[1]); 
-        dd=Number(p[2]); 
-      } else if (p.length === 2) {
-        mm=Number(p[0]); 
-        dd=Number(p[1]);
-      }
-    } else if (typeof b === 'string' && b.includes('/')){
-      const p=b.split('/'); 
-      if (p.length>=2){ 
-        mm=Number(p[0]); 
-        dd=Number(p[1]); 
-        if (p[2]) yy=Number(p[2]); 
-      }
-    } else {
-      mm = Number(m.birthMonth||m.bMonth||0)||null;
-      dd = Number(m.birthDay||m.bDay||0)||null;
-      yy = Number(m.birthYear||m.bYear||0)||null;
-    }
-    
-    if (!mm || !dd) continue;
-
-    // ✅ USE memberLabel() TO INCLUDE TITLE
-    const name = memberLabel(m);
-    
-    const dateLabel = `${String(mm).padStart(2,'0')}/${String(dd).padStart(2,'0')}`;
-    let ageLabel='';
-    if (yy && yy>1900){
-      const now=new Date();
-      let age = now.getFullYear()-yy;
-      const had = (now.getMonth()+1>mm) || ((now.getMonth()+1===mm) && (now.getDate()>=dd));
-      if (!had) age-=1;
-      if (age>0 && age<130) ageLabel=`Age ${age}`;
-    }
-    list.push({ name, mm, dd, dateLabel, ageLabel });
-  }
-  list.sort((a,b)=> (a.mm-b.mm) || (a.dd-b.dd) || a.name.localeCompare(b.name));
-  return list;
-}
-
-function __extractBodyAndStyles(html){
-  let styles = '';
-  let body = html || '';
-  try{
-    if (/<html[\s>]/i.test(body) || /<\/head>/i.test(body) || /<\/body>/i.test(body)){
-      const styleRe = /<style[^>]*>([\s\S]*?)<\/style>/gi;
-      let m;
-      while ((m = styleRe.exec(body)) !== null){
-        styles += (m[1] || '') + '\n';
-      }
-      const bodyMatch = body.match(/<body[^>]*>([\s\S]*?)<\/body>/i);
-      body = bodyMatch ? bodyMatch[1] : body;
-    }
-  }catch(e){}
-  return { styles, body };
-}
-
-async function previewHtmlAsPdf(filename, html, opts = {}){
-  const hasJsPdf = !!(window.jspdf && window.jspdf.jsPDF);
-
-  const fallback = () => {
-    const w = window.open('', '_blank', 'width=900,height=700');
-    if (!w) { showToast('Popup blocked. Please allow popups to print.', 'error'); return; }
-    w.document.open(); w.document.write(html); w.document.close();
-    setTimeout(() => { w.focus(); w.print(); }, 500);
-  };
-
-  if (!hasJsPdf) return fallback();
-  if (typeof window.html2canvas !== 'function') {
-    console.error('html2canvas is not loaded.');
-    return fallback();
-  }
-
-  const { jsPDF } = window.jspdf;
-  const doc = new jsPDF({ unit:'pt', format:'letter', orientation:(opts.orientation||'portrait') });
-  
-  if (typeof doc.html !== 'function') return fallback();
-
-  const { styles:__styles, body:__body } = __extractBodyAndStyles(html);
-
-  const container = document.createElement('div');
-  
-  // CRITICAL FIX: Keep it visible but off-screen
-  container.style.position = 'fixed';
-  container.style.left = '0';
-  container.style.top = '0';
-  container.style.width = (opts.windowWidthPx||800)+'px';
-  container.style.background = '#fff';
-  container.style.color = '#000';
-  container.style.padding = '20px';
-  container.style.zIndex = '-1';  // Behind everything
-  container.style.visibility = 'hidden';  // Hidden but still rendered
-  
-  container.innerHTML = `${__styles ? `<style>${__styles}</style>` : ''}${__body}`;
-  document.body.appendChild(container);
-
-  // Wait for layout to complete
-  await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
-
-  try {
-    await new Promise((resolve, reject) => {
-      doc.html(container, {
-        x: 36,
-        y: 36,
-        width: (opts.docWidthPt || 540),
-        windowWidth: (opts.windowWidthPx || 800),
-        autoPaging: 'text',
-        html2canvas: { 
-          scale: (opts.scale || 0.9),
-          useCORS: true,
-          allowTaint: true,
-          backgroundColor: '#ffffff',
-          logging: true,
-          width: container.scrollWidth,
-          height: container.scrollHeight
-        },
-        callback: () => resolve(),
-        error: (err) => {
-          console.error('PDF generation error:', err);
-          reject(err);
-        }
-      });
-    });
-
-    container.remove();
-
-    if (typeof showJsPdfInModal === 'function') {
-      return showJsPdfInModal(doc, filename || 'document.pdf', opts.title || 'PDF Preview');
-    }
-    
-    doc.save(filename || 'document.pdf');
-    
-  } catch (err) {
-    console.error('PDF generation failed:', err);
-    container.remove();
-    fallback();
-  }
-}
-
 /* ---------- PDF preview modal utilities (using PDF.js canvas renderer) ---------- */
-
-function buildPrintHtml(title, bodyHtml, styleText){
-  return `<!doctype html><html><head><meta charset="utf-8"><title>${title||''}</title><style>${styleText||''}</style></head><body>${bodyHtml||''}</body></html>`;
-}
 
 let __pdfLastFocusEl = null;
 
@@ -1228,10 +1032,7 @@ document.addEventListener('click', (e)=>{
 
 /* ---------- End PDF preview modal utilities ---------- */
 
-// 1) Define IS_ELECTRON first
-const IS_ELECTRON =
-  typeof window !== 'undefined' &&
-  !!window.appApi &&
+const IS_ELECTRON = false;
   !!window.membersApi;
 
 // Top-level state (must be declared before boot() is called)
@@ -1248,7 +1049,6 @@ window.__AUTH_CHECK_READY__ = false;
   }
 
   try {
-    await ensureNetworkDataRoot();
     window.__AUTH_CHECK_READY__ = true;
   } catch (err) {
     console.error('Failed to initialize:', err);
@@ -1256,21 +1056,6 @@ window.__AUTH_CHECK_READY__ = false;
     // NOTE: leave __AUTH_CHECK_READY__ as false so auth-check keeps waiting
   }
 })();
-
-async function ensureNetworkDataRoot(){
-  if (!IS_ELECTRON) return;
-  try {
-    const cfg = await window.appApi.getConfig();
-    if (cfg && cfg.dataRootPath) return;
-  } catch (e) {
-    // Continue to folder picker if config cannot be read.
-  }
-
-  const res = await window.appApi.chooseDataRoot();
-  if (!res || res.canceled || !res.dataRootPath) {
-    throw new Error('No data folder selected.');
-  }
-}
 
 /********** Storage layer (Electron encrypted store first, IndexedDB fallback) **********/
 
@@ -1358,7 +1143,6 @@ const SB_TABLE = {
 };
 
 async function idbGetAll(store) {
-  if (IS_ELECTRON) return membersGetAll(store);
   // Try Supabase first
   if (sbReady() && SB_TABLE[store]) {
     const rows = await sbGetAll(SB_TABLE[store]);
@@ -1375,7 +1159,6 @@ async function idbGetAll(store) {
 }
 
 async function idbGet(store, key) {
-  if (IS_ELECTRON) return membersGet(store, key);
   if (sbReady() && SB_TABLE[store]) {
     const { data, error } = await window._sbClient.from(SB_TABLE[store]).select('*').eq('id', key).maybeSingle();
     if (!error) return data || null;
@@ -1390,7 +1173,6 @@ async function idbGet(store, key) {
 }
 
 async function idbPut(store, val) {
-  if (IS_ELECTRON) return membersPut(store, val).then(()=>true);
   // Write to both Supabase and IDB
   if (sbReady() && SB_TABLE[store]) await sbUpsert(SB_TABLE[store], val);
   return new Promise((res,rej)=>{
@@ -1403,7 +1185,6 @@ async function idbPut(store, val) {
 }
 
 async function idbPutMany(store, arr) {
-  if (IS_ELECTRON) return membersPutMany(store, arr).then(()=>true);
   if (!arr || !arr.length) return true;
   if (sbReady() && SB_TABLE[store]) await sbUpsertMany(SB_TABLE[store], arr);
   return new Promise((res,rej)=>{
@@ -1421,7 +1202,6 @@ async function idbPutMany(store, arr) {
 }
 
 async function idbDelete(store, key) {
-  if (IS_ELECTRON && ELECTRON_BACKED_STORES.includes(store)) return membersDelete(store, key).then(()=>true);
   if (sbReady() && SB_TABLE[store]) await sbDelete(SB_TABLE[store], key);
   return new Promise((res,rej)=>{
     if (!idb) { res(true); return; }
@@ -1500,131 +1280,6 @@ let idb;
 
 
 // --- Electron IPC helpers (support common preload signatures) ---
-function getMembersApi(){
-  if (!IS_ELECTRON) return null;
-  const api = window.membersApi;
-  if (!api) return null; // Return null instead of throwing
-  return api;
-}
-async function membersGetAll(storeName){
-  const api = getMembersApi();
-  
-  if (api) {
-    // 1) Preload signature: getAll(storeName)
-    try { return await api.getAll(storeName); } catch (_) {}
-
-    // 2) Alternate signature: getAll({ storeName })
-    try { return await api.getAll({ storeName }); } catch (_) {}
-
-    // 3) Generic invoke-style
-    if (typeof api.invoke === 'function') {
-      try {
-        return await api.invoke('members:getAll', { storeName });
-      } catch (_) {}
-    }
-  }
-
-  // Fall back to IndexedDB if Electron API fails or not available
-  return new Promise((res,rej)=>{
-    if (!idb) { rej(new Error('IDB not initialized')); return; }
-    const t = idb.transaction([storeName], 'readonly');
-    const st = t.objectStore(storeName);
-    const r = st.getAll();
-    r.onsuccess = () => res(r.result || []);
-    r.onerror = () => rej(r.error);
-  });
-}
-
-async function membersGet(storeName, key){
-  const api = getMembersApi();
-
-  if (api) {
-    try { return await api.get(storeName, key); } catch (_) {}
-    try { return await api.get({ storeName, key }); } catch (_) {}
-
-    if (typeof api.invoke === 'function') {
-      try {
-        return await api.invoke('members:get', { storeName, key });
-      } catch (_) {}
-    }
-  }
-
-  // Fall back to IndexedDB if Electron API fails or not available
-  return new Promise((res,rej)=>{
-    if (!idb) { rej(new Error('IDB not initialized')); return; }
-    const t = idb.transaction([storeName], 'readonly');
-    const st = t.objectStore(storeName);
-    const r = st.get(key);
-    r.onsuccess = () => res(r.result);
-    r.onerror = () => rej(r.error);
-  });
-}
-
-async function membersPut(storeName, value){
-  const api = getMembersApi();
-
-  if (api) {
-    try { return await api.put(storeName, value); } catch (_) {}
-    try { return await api.put({ storeName, value }); } catch (_) {}
-
-    if (typeof api.invoke === 'function') {
-      try {
-        return await api.invoke('members:put', { storeName, value });
-      } catch (_) {}
-    }
-  }
-
-  // Fall back to IndexedDB if Electron API fails or not available
-  return new Promise((res,rej)=>{
-    if (!idb) { rej(new Error('IDB not initialized')); return; }
-    const t = idb.transaction([storeName], 'readwrite');
-    const st = t.objectStore(storeName);
-    const r = st.put(value);
-    r.onsuccess = () => res(true);
-    r.onerror = () => rej(r.error);
-  });
-}
-
-async function membersPutMany(storeName, values){
-  const api = getMembersApi();
-
-  if (api) {
-    try { return await api.putMany(storeName, values); } catch (_) {}
-    try { return await api.putMany({ storeName, values }); } catch (_) {}
-
-    if (typeof api.invoke === 'function') {
-      try {
-        return await api.invoke('members:putMany', { storeName, values });
-      } catch (_) {}
-    }
-  }
-
-  // Fall back to IndexedDB if Electron API fails or not available
-  return new Promise((res,rej)=>{
-    if (!idb) { rej(new Error('IDB not initialized')); return; }
-    const t = idb.transaction([storeName], 'readwrite');
-    const st = t.objectStore(storeName);
-    let i = 0;
-    function next(){
-      if(i >= values.length){ res(true); return; }
-      const r = st.put(values[i++]);
-      r.onsuccess = next;
-      r.onerror = () => rej(r.error);
-    }
-    next();
-  });
-}
-
-async function membersDelete(storeName, key){
-  const api = getMembersApi();
-
-  try { return await api.delete(storeName, key); } catch (_) {}
-  try { return await api.delete({ storeName, key }); } catch (_) {}
-
-  if (typeof api.invoke === 'function') return await api.invoke('members:delete', { storeName, key });
-
-  throw new Error('Unable to call membersApi.delete');
-}
 
 // --- IndexedDB fallback ---
 function idbOpen() {
@@ -1654,7 +1309,6 @@ function tx(storeNames, mode='readonly'){
   return idb.transaction(storeNames, mode);
 }
 
-const ELECTRON_BACKED_STORES = ['members','ministries','meta','auth','activity','songs','musicSched','rosters','rehearsalNotes','events'];
 
 /********** Recent Member Activity (feeds Dashboard widget) **********/
 const LS_MEMBER_ACTIVITY = 'lw_member_activity_v1'; // kept for migration reference only
@@ -1702,28 +1356,8 @@ async function appendMemberActivity(entry){
 }
 
 // Minimal diff helper (only logs fields that changed)
-function diffFields(before, after, fields){
-  const out = [];
-  for (const f of fields) {
-    const b = (before?.[f] ?? '');
-    const a = (after?.[f] ?? '');
-    // normalize arrays
-    const bNorm = Array.isArray(b) ? b.join('|') : String(b);
-    const aNorm = Array.isArray(a) ? a.join('|') : String(a);
-    if (bNorm !== aNorm) out.push({ field: f, from: b, to: a });
-  }
-  return out;
-}
 
 // Clear helper used by import (works in both Electron and IndexedDB)
-async function clearStore(storeName){
-  const rows = await idbGetAll(storeName);
-  const keyField = (storeName === 'members' || storeName === 'ministries' || storeName === 'events') ? 'id' : 'key';
-  for (const row of (rows || [])){
-    const k = row?.[keyField];
-    if (k !== undefined && k !== null && String(k) !== '') await idbDelete(storeName, k);
-  }
-}
 
 /********** Data + auth **********/
 const STATES=["AL","AK","AZ","AR","CA","CO","CT","DE","FL","GA","HI","ID","IL","IN","IA","KS","KY","LA","ME","MD","MA","MI","MN","MS","MO","MT","NE","NV","NH","NJ","NM","NY","NC","ND","OH","OK","OR","PA","RI","SC","SD","TN","TX","UT","VT","VA","WA","WV","WI","WY"];
@@ -1763,11 +1397,6 @@ async function removeCalendarEvent(id){
 
 let showArchived = false;
 let currentViewMember = null;
-function sampleMembers(){
-  return [
-    {id:'1', title:'Mr.', first:'John', middle:'',   last:'Doe', suffix:'',    phone:'555-555-5656', email:'', address1:'', address2:'', city:'Andalusia', state:'AL', zip:'36420', marital:'Single',  gender:'Male', birthDate:'2014-11-07', joinDate:'', baptismDate:'', spouseId:'',  childrenIds:[], ministries:["Youth Ministry","Praise Team"], photo:''},
-  ];
-}
 
 /********** Utils **********/
 const $ = id=>document.getElementById(id);
@@ -1817,93 +1446,11 @@ function fmtLongDate(d) {
 
 function memberLabel(m){ return `${m.title?m.title+' ':''}${m.first} ${m.middle?m.middle+' ':''}${m.last}${m.suffix?', '+m.suffix:''}`.trim(); }
 // Keep member names available to all pages (LocalStorage mirror)
-function syncMembersToLocalStorage(){
-  try{
-    const list = (Array.isArray(members)?members:[])
-      .map(m => ({
-        id: String(m.id||""),
-        name: memberLabel(m),
-        status: (m.status || "active")
-      }))
-      .filter(x => x.name && x.name.trim())
-      .sort((a,b) => a.name.localeCompare(b.name));
-    localStorage.setItem("memberList", JSON.stringify(list));
-    localStorage.setItem("memberNames", JSON.stringify(list.map(x=>x.name)));
-    localStorage.setItem("lw_members_last_sync", new Date().toISOString());
-  }catch(e){
-    console.warn("Member sync failed:", e);
-  }
-}
 
 // --- Special Acknowledgments (Milestone / Reason) integration ---
 const ACK_STORAGE_KEY = "church_app_acknowledgments_v1"; // matches special-acknowledgments.html
 
-function loadAcknowledgments(){
-  try{
-    const raw = localStorage.getItem(ACK_STORAGE_KEY);
-    const arr = JSON.parse(raw || "[]");
-    return Array.isArray(arr) ? arr : [];
-  }catch(_){
-    return [];
-  }
-}
-
 // very small HTML escape (so a stored value can't break your card HTML)
-function escHtml(s){
-  return String(s ?? "")
-    .replace(/&/g,"&amp;")
-    .replace(/</g,"&lt;")
-    .replace(/>/g,"&gt;")
-    .replace(/"/g,"&quot;")
-    .replace(/'/g,"&#39;");
-}
-
-function ackDateKey(a){
-  // Prefer milestoneDate (used by the form), fall back to createdAt if present
-  const d = (a && a.milestoneDate) ? String(a.milestoneDate) : "";
-  if (/^\d{4}-\d{2}-\d{2}$/.test(d)) return Number(d.replace(/-/g,""));
-  if (a && typeof a.createdAt === "number") return a.createdAt;
-  return 0;
-}
-
-function getLatestMilestoneForMember(memberName){
-  const name = String(memberName || "").trim().toLowerCase();
-  if (!name) return "";
-
-  const all = loadAcknowledgments();
-
-  // Match by "person" field from special-acknowledgments
-  const mine = all.filter(a =>
-    a && typeof a.person === "string" &&
-    a.person.trim().toLowerCase() === name
-  );
-
-  if (!mine.length) return "";
-
-  // Sort newest-first by milestoneDate (or createdAt fallback)
-  mine.sort((a,b)=> ackDateKey(b) - ackDateKey(a));
-
-  // "milestone" is the Milestone / Reason field in special-acknowledgments
-  return String(mine[0].milestone || "").trim();
-}
-
-function milestoneLineHtmlCard(memberName){
-  const ms = getLatestMilestoneForMember(memberName);
-  if (!ms) return "";
-  // Keep the card looking the same (muted)
-  return `<div class="muted" style="margin:10px 0;">
-    <strong>Milestone:</strong> ${escHtml(ms)}
-  </div>`;
-}
-
-function milestoneLineHtmlOpen(memberName){
-  const ms = getLatestMilestoneForMember(memberName);
-  if (!ms) return "";
-  // Match Birthdate/Gender/etc in the OPEN modal (not muted)
-  return `<div style="margin:10px 0;">
-    <strong>Milestone:</strong> ${escHtml(ms)}
-  </div>`;
-}
 
 function nextMemberId(){ return String(members.reduce((mx,m)=>Math.max(mx,Number(m.id)||0),0)+1); }
 function byNameAsc(a,b){ return memberLabel(a).localeCompare(memberLabel(b)); }
@@ -1977,12 +1524,6 @@ function fmtMDY(d){
   const dd=String(dt.getDate()).padStart(2,'0');
   const yy=String(dt.getFullYear());
   return `${mm}-${dd}-${yy}`;
-}
-function isAdult(m){ const a=ageFromDOB(m.birthDate); return a!=='' && a>=18; }
-function isIndependentAdult(m){
-  const age = ageFromDOB(m.birthDate);
-  const hasKids = (m.childrenIds||[]).length>0 || (m.nonMemberChildren||[]).length>0;
-  return (age!=='' && age>=25) || m.marital==='Married' || hasKids;
 }
 
 /********** Datalist + chips **********/
@@ -2373,21 +1914,11 @@ async function saveFromModal(e){
       rec.nonMemberChildren = prev.nonMemberChildren || [];
       if (!rec.hasNonMemberChildren) rec.hasNonMemberChildren = prev.hasNonMemberChildren || false;
 
-      // Log changes
-      const changes = diffFields(prev, rec, [
-        'first','middle','last','suffix','phone','email',
-        'address1','address2','city','state','zip',
-        'marital','gender','birthDate','joinDate','baptismDate',
-        'status','spouseId','childrenIds','ministries'
-      ]);
-
-      if (changes.length) {
-        appendMemberActivity({
-          action: 'member_updated',
-          summary: `Updated: ${rec.first || ''} ${rec.last || ''}`.trim() || `Member ${rec.id}`,
-          details: { changes }
-        });
-      }
+      appendMemberActivity({
+        action: 'member_updated',
+        summary: `Updated: ${rec.first || ''} ${rec.last || ''}`.trim() || `Member ${rec.id}`,
+        details: {}
+      });
 
       await idbPut('members', rec);
     } else {
@@ -2433,7 +1964,6 @@ async function saveFromModal(e){
       if (!Array.isArray(calendarEvents)) calendarEvents = [];
     } catch (_) { calendarEvents = []; }
     refreshMembersDatalist();
-    syncMembersToLocalStorage();
     renderMembers();
     $('memberModal').close();
     tempPhotoDataUrl = '';
@@ -2484,9 +2014,6 @@ function viewCard(m) {
     ? `<div><strong>Spouse:</strong> ${escapeHtml(m.nonMemberSpouse)}</div>`
     : "";
 
-  const maritalHtml = (age >= 18 && m.marital)
-    ? `<div><strong>Marital:</strong> ${m.marital}</div>`
-    : "";
 
   const nmKids = m.nonMemberChildren || [];
   const allChildNames = [
@@ -2539,22 +2066,17 @@ function viewCard(m) {
           ${m.address1 || ''}<br>
           ${(m.city || '')}${m.state ? ', ' + m.state : ''} ${m.zip || ''}
           <br>
-          ${m.phone || ''}
           <br>
-          ${m.email || ''}
         </div>
 
         <div style="margin-top:12px;font-size:15px;line-height:1.65">
-${m.birthDate ? `<div><strong>Birthdate:</strong> ${fmtLongDate(m.birthDate)} ${age ? `(Age ${age})` : ""}</div>` : ""}
           <div><strong>Gender:</strong> ${m.gender || ""}</div>
 
-          ${maritalHtml}
           ${spouseHtml}
           ${childrenHtml}
 
           ${joinHtml}
           ${baptHtml}
-		  ${milestoneLineHtmlOpen(memberLabel(m))}
 
         </div>
 
@@ -2608,7 +2130,6 @@ if (!yes) return;
   await idbDelete('members', id);
   members = await idbGetAll('members');
   refreshMembersDatalist();
-  syncMembersToLocalStorage();
   renderMembers();
 }
 
@@ -2628,365 +2149,7 @@ if (!yes) return;
   await idbPut('members', m);
   members = await idbGetAll('members');
   refreshMembersDatalist();
-  syncMembersToLocalStorage();
   renderMembers();
-}
-
-async function exportJSON(){
-  const blob = new Blob([JSON.stringify({members, ministries:MINISTRIES}, null, 2)], {type:'application/json'});
-  const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='members.json'; a.click(); URL.revokeObjectURL(a.href);
-}
-
-async function exportExcel() {
-  if (typeof XLSX === 'undefined') { showToast('Excel library (XLSX) is not loaded.', 'error'); return; }
-
-  const headers = [
-    "id","title","first","middle","last","suffix","phone","email",
-    "address1","address2","city","state","zip","marital","gender",
-    "birthDate","joinDate","baptismDate","spouseId",
-    "childrenIds","ministries"
-  ];
-
-  const data = members.map(m => ({
-    id: m.id,
-    title: m.title || "",
-    first: m.first || "",
-    middle: m.middle || "",
-    last: m.last || "",
-    suffix: m.suffix || "",
-    phone: m.phone || "",
-    email: m.email || "",
-    address1: m.address1 || "",
-    address2: m.address2 || "",
-    city: m.city || "",
-    state: m.state || "",
-    zip: m.zip || "",
-    marital: m.marital || "",
-    gender: m.gender || "",
-    birthDate: m.birthDate || "",
-    joinDate: m.joinDate || "",
-    baptismDate: m.baptismDate || "",
-    status: m.status || "active",  // ← ADD THIS LINE
-    spouseId: m.spouseId || "",
-    childrenIds: (m.childrenIds || []).join("|"),
-    ministries: (m.ministries || []).join("|")
-  }));
-
-  const worksheet = XLSX.utils.json_to_sheet(data);
-  const workbook = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(workbook, worksheet, "Members");
-  XLSX.writeFile(workbook, "members.xlsx");
-}
-
-async function handleImport(e){
-  if (typeof XLSX === 'undefined') { showToast('Excel library (XLSX) is not loaded.', 'error'); e.target.value=''; return; }
-
-  if (!isAdmin) {
-    alert('Enabled.');
-    e.target.value = '';
-    return;
-  }
-
-  const file = e.target.files[0];
-  if (!file) return;
-
-  const reader = new FileReader();
-
-  reader.onload = async (evt) => {
-    const data = evt.target.result;
-    const workbook = XLSX.read(data, { type: "array" });
-    const sheet = workbook.Sheets[workbook.SheetNames[0]];
-    const arr = XLSX.utils.sheet_to_json(sheet, { defval: "" });
-
-    let newMembers = [];
-    let updatedMembers = [];
-    let skippedMembers = [];
-
-    const toProcess = arr
-      .map(obj => {
-        // Skip rows with no name
-        if ((!obj.first || obj.first.trim() === "") &&
-            (!obj.last || obj.last.trim() === "")) {
-          return null;
-        }
-
-        // Find existing member by ID or by name match
-        let existing = null;
-        if (obj.id && obj.id !== "undefined" && obj.id !== "") {
-          existing = members.find(m => m.id == obj.id);
-        }
-        
-        // If no ID match, try to find by name
-        if (!existing) {
-          existing = members.find(m => 
-            m.first.toLowerCase() === (obj.first || "").toLowerCase() &&
-            m.last.toLowerCase() === (obj.last || "").toLowerCase()
-          );
-        }
-
-        const importData = {
-          id: existing ? existing.id : nextMemberId(),
-          title: obj.title || "",
-          first: obj.first || "",
-          middle: obj.middle || "",
-          last: obj.last || "",
-          suffix: obj.suffix || "",
-          phone: obj.phone || "",
-          email: obj.email || "",
-          address1: obj.address1 || "",
-          address2: obj.address2 || "",
-          city: obj.city || "",
-          state: obj.state || "",
-          zip: obj.zip || "",
-          marital: obj.marital || "",
-          gender: obj.gender || "",
-          birthDate: normalizeBirthDate(obj.birthDate),
-          joinDate: normalizeBirthDate(obj.joinDate),
-          baptismDate: normalizeBirthDate(obj.baptismDate),
-          spouseId: obj.spouseId || "",
-          childrenIds: String(obj.childrenIds || "").split('|').filter(Boolean),
-          ministries: String(obj.ministries || "").split('|').filter(Boolean),
-          photo: existing?.photo || "",
-          status: obj.status || existing?.status || "active"
-        };
-
-        // If member exists, check if data is different
-        if (existing) {
-          let changedFields = [];
-          
-          // Compare all fields
-          for (const key in importData) {
-            if (key === 'id' || key === 'photo') continue; // Skip these
-            
-            // Handle arrays
-            if (Array.isArray(importData[key])) {
-              const existingArr = existing[key] || [];
-              const importArr = importData[key];
-              if (JSON.stringify(existingArr.sort()) !== JSON.stringify(importArr.sort())) {
-                changedFields.push({
-                  field: key,
-                  oldValue: existingArr.join(', '),
-                  newValue: importArr.join(', ')
-                });
-              }
-            }
-            // Handle regular fields
-            else {
-              if ((existing[key] || "") !== (importData[key] || "")) {
-                changedFields.push({
-                  field: key,
-                  oldValue: existing[key] || "(empty)",
-                  newValue: importData[key] || "(empty)"
-                });
-              }
-            }
-          }
-
-          if (changedFields.length === 0) {
-            skippedMembers.push({
-              name: memberLabel(importData),
-              reason: "No changes detected"
-            });
-            return null; // Skip unchanged records
-          }
-          
-          updatedMembers.push({
-            name: memberLabel(importData),
-            changes: changedFields
-          });
-        } else {
-          newMembers.push({
-            name: memberLabel(importData),
-            data: importData
-          });
-        }
-
-        return importData;
-      })
-      .filter(Boolean);
-
-    if (toProcess.length > 0) {
-      await idbPutMany("members", toProcess);
-      members = await idbGetAll("members");
-      refreshMembersDatalist();
-      syncMembersToLocalStorage();
-  renderMembers();
-    }
-
-    // Show detailed summary
-    showImportSummary(newMembers, updatedMembers, skippedMembers);
-    
-    e.target.value = "";
-  };
-
-  reader.readAsArrayBuffer(file);
-}
-
-function showImportSummary(newMembers, updatedMembers, skippedMembers) {
-  let html = `
-    <div style="margin-bottom:20px;">
-      <h3 style="color:#16a34a;margin:10px 0;">✅ New Members (${newMembers.length})</h3>
-      ${newMembers.length > 0 ? `
-        <ul style="list-style:none;padding:0;">
-          ${newMembers.map(m => `
-            <li style="padding:8px;background:#f0fdf4;border-left:3px solid #16a34a;margin:4px 0;border-radius:4px;">
-              <strong>${m.name}</strong>
-              <div style="font-size:12px;color:#666;margin-top:4px;">
-                ${m.data.email || ''} ${m.data.phone ? '• ' + m.data.phone : ''}
-              </div>
-            </li>
-          `).join('')}
-        </ul>
-      ` : '<p class="muted">None</p>'}
-    </div>
-
-    <div style="margin-bottom:20px;">
-      <h3 style="color:#1f4aa8;margin:10px 0;">📝 Updated Members (${updatedMembers.length})</h3>
-      ${updatedMembers.length > 0 ? `
-        <ul style="list-style:none;padding:0;">
-          ${updatedMembers.map(m => `
-            <li style="padding:12px;background:#eff6ff;border-left:3px solid #1f4aa8;margin:4px 0;border-radius:4px;">
-              <strong>${m.name}</strong>
-              <div style="margin-top:8px;">
-                ${m.changes.map(c => `
-                  <div style="font-size:13px;padding:4px 0;border-bottom:1px solid #ddd;">
-                    <span style="font-weight:600;color:#1f4aa8;">${c.field}:</span>
-                    <div style="margin-left:12px;color:#666;">
-                      <span style="color:#dc2626;text-decoration:line-through;">${c.oldValue}</span>
-                      →
-                      <span style="color:#16a34a;font-weight:600;">${c.newValue}</span>
-                    </div>
-                  </div>
-                `).join('')}
-              </div>
-            </li>
-          `).join('')}
-        </ul>
-      ` : '<p class="muted">None</p>'}
-    </div>
-  `;
-
-  $('importSummaryContent').innerHTML = html;
-  $('importSummaryModal').showModal();
-}
-
-function printPDF(){
-  const { jsPDF } = window.jspdf;
-  const doc = new jsPDF({unit:'pt', format:'letter'});
-  doc.setFont('helvetica','normal');
-  doc.setFontSize(16); 
-  doc.text('The Living Word Church – Member Directory', 40, 40);
-  
-  // Filter for active members only, then sort by last name, then first name
-  const sortedMembers = [...members]
-    .filter(m => (m.status || 'active') === 'active')
-    .sort((a, b) => {
-      const lastA = (a.last || '').toLowerCase();
-      const lastB = (b.last || '').toLowerCase();
-      if (lastA !== lastB) return lastA.localeCompare(lastB);
-      const firstA = (a.first || '').toLowerCase();
-      const firstB = (b.first || '').toLowerCase();
-      return firstA.localeCompare(firstB);
-    });
-  
-  const rows = sortedMembers.map(m=>[
-    // Name without title, but with suffix
-    `${m.first} ${m.middle?m.middle+' ':''}${m.last}${m.suffix?', '+m.suffix:''}`.trim(),
-    m.phone||'',
-    m.email||'',
-    [m.address1, m.address2, `${m.city||''}${m.state?`, ${m.state}`:''} ${m.zip||''}`.trim()].filter(Boolean).join(' • ')
-  ]);
-  
-  doc.autoTable({ 
-    startY: 60, 
-    head: [['Name','Phone','Email','Address']],
-    body: rows, 
-    styles:{fontSize:9, cellPadding:4}, 
-    headStyles:{fillColor:[31,74,168]} 
-  });
-  
-  showJsPdfInModal(doc, 'member-directory.pdf', 'Member Directory');
-}
-
-function printBooklet() {
-  const { jsPDF } = window.jspdf;
-  const doc = new jsPDF({ unit: 'pt', format: 'letter' });
-  
-  const sorted = [...members].sort(byNameAsc);
-  
-  sorted.forEach((m, index) => {
-    if (index > 0) doc.addPage();
-    
-    // Add photo if available
-    if (m.photo) {
-      try {
-        doc.addImage(m.photo, 'JPEG', 40, 40, 150, 150);
-      } catch (e) {
-        console.log('Could not add photo for', memberLabel(m));
-      }
-    }
-    
-    // Member name (large)
-    doc.setFontSize(24);
-    doc.setFont('helvetica', 'bold');
-    doc.text(memberLabel(m), m.photo ? 210 : 40, 80);
-    
-    let yPos = m.photo ? 120 : 120;
-    doc.setFontSize(14);
-    doc.setFont('helvetica', 'normal');
-    
-    // Birthday
-    if (m.birthDate) {
-      const age = ageFromDOB(m.birthDate);
-      doc.text(`Birthday: ${getBirthdayDisplay(m)}${age ? ' (Age ' + age + ')' : ''}`, m.photo ? 210 : 40, yPos);
-      yPos += 25;
-    }
-    
-    // Spouse
-    if (m.spouseId) {
-      const spouse = members.find(x => x.id === m.spouseId);
-      if (spouse) {
-        doc.text(`Spouse: ${memberLabel(spouse)}`, m.photo ? 210 : 40, yPos);
-        yPos += 25;
-      }
-    }
-    
-    // Children
-    if (m.childrenIds && m.childrenIds.length > 0) {
-      const childNames = m.childrenIds
-        .map(id => members.find(x => x.id === id))
-        .filter(Boolean)
-        .map(c => memberLabel(c))
-        .join(', ');
-      
-      if (childNames) {
-        doc.text(`Children: ${childNames}`, m.photo ? 210 : 40, yPos, { maxWidth: 350 });
-        yPos += 25 * Math.ceil(childNames.length / 50); // Rough estimate for wrapping
-      }
-    }
-    
-    // Join Date
-    if (m.joinDate) {
-      doc.text(`Joined: ${fmtMDY(m.joinDate)}`, m.photo ? 210 : 40, yPos);
-      yPos += 25;
-    }
-    
-    // Ministries
-    if (m.ministries && m.ministries.length > 0) {
-      yPos += 10;
-      doc.setFont('helvetica', 'bold');
-      doc.text('Ministries:', m.photo ? 210 : 40, yPos);
-      yPos += 20;
-      
-      doc.setFont('helvetica', 'normal');
-      m.ministries.forEach(min => {
-        doc.text(`• ${min}`, m.photo ? 220 : 50, yPos);
-        yPos += 18;
-      });
-    }
-  });
-  
-  showJsPdfInModal(doc, 'member-booklet.pdf', 'Member Booklet');
 }
 /********** Members (cards & list) **********/
 function renderMembers(){
@@ -3004,23 +2167,6 @@ arr = arr.filter(m => {
 
   // Status filter
   if (memberFilterState.status && (m.status || 'active') !== memberFilterState.status)
-    return false;
-
-  // Gender filter
-  if (memberFilterState.gender && m.gender !== memberFilterState.gender)
-    return false;
-
-  // Marital filter
-  if (memberFilterState.marital && m.marital !== memberFilterState.marital)
-    return false;
-
-  // Age filter
-  const age = m.birthDate ? ageFromDOB(m.birthDate) : null;
-
-  if (memberFilterState.minAge && (!age || age < Number(memberFilterState.minAge)))
-    return false;
-
-  if (memberFilterState.maxAge && (!age || age > Number(memberFilterState.maxAge)))
     return false;
 
   // Ministries filter
@@ -3043,7 +2189,6 @@ arr = arr.filter(m => {
 
   for (const m of arr) {
     const photoHtml = m.photo ? `<img class="photo" src="${m.photo}" alt="photo">` : '';
-    const age = m.birthDate ? ageFromDOB(m.birthDate) : '';
     const mins = (m.ministries && m.ministries.length)
       ? `<div class="chips">${m.ministries.slice(0, 3).map(x => `<span class="chip">${x}</span>`).join('')}</div>`
       : '';
@@ -3069,16 +2214,7 @@ arr = arr.filter(m => {
   })()}
 </div>
 
-          ${isAdmin ? `<div class="muted">
-              ${[m.address1, m.address2, `${m.city || ''}${m.state ? `, ${m.state}` : ''} ${m.zip || ''}`.trim()]
-                .filter(Boolean)
-                .join('<br>')}
-            </div>` : ''}
 
-          ${m.phone ? `<div class="muted">${m.phone}</div>` : ''}
-          ${m.email ? `<div class="muted">${m.email}</div>` : ''}
-          ${age !== '' ? `<div class="muted">Age ${age}</div>` : ''}
-          ${m.birthDate ? `<div class="muted">Birthday: ${getBirthdayDisplay(m)}</div>` : ''}
         </div>
       </div>
 
@@ -3114,14 +2250,7 @@ arr = arr.filter(m => {
 /********** Ministries **********/
 let currentMinistryId = null;
 
-let memberFilterState = {
-  status: '',
-  gender: '',
-  marital: '',
-  minAge: '',
-  maxAge: '',
-  ministries: []
-};
+let memberFilterState = { status: '', ministries: [] };
 
 function loadMinistryManager(){
   const ul = $('ministryList');
@@ -4256,108 +3385,6 @@ function renderCalendar() {
   renderCalendarGrid();
 }
 
-function renderCalendarCards() {
-  const calMembers = getCalendarMembers(); // <-- add this
-
-  const grid = $('calendarCardWrap');
-  grid.innerHTML = '';
-
-  const monthVal = $('calMonth').value;
-  const now = monthVal ? new Date(monthVal + '-01T00:00:00') : new Date();
-  const m = now.getMonth();
-
-  const activeTypes = Array.from(document.querySelectorAll('.calToggle:checked')).map(cb => cb.dataset.cal);
-  if (!activeTypes.length) {
-    grid.innerHTML = '<div class="muted">Select at least one date type to display.</div>';
-    return;
-  }
-
-  const fieldMap = { birth: 'birthDate', join: 'joinDate', baptism: 'baptismDate' };
-const labelMap = { birth: 'Birthday', join: 'Join Date', baptism: 'Baptism Date', event: 'Event', service: 'Order of Service', choir: 'Choir', praise: 'Praise Team' };
-let entries = [];
-  for (const type of activeTypes) {
-    if (type === 'event' || type === 'service' || type === 'choir' || type === 'praise') {
-      (calendarEvents || []).forEach(ev => {
-        if (!ev || !ev.date || !ev.title) return;
-
-        // Filter by type
-        if (type === 'event' && ev.type !== 'event' && ev.type !== undefined && ev.type !== '') return;
-        if (type === 'service' && ev.type !== 'service') return;
-        if (type === 'choir' && ev.type !== 'choir') return;
-        if (type === 'praise' && ev.type !== 'praise') return;
-
-        // Parse date safely without timezone shifts
-        const parts = ev.date.split('-').map(Number);
-        if (parts.length !== 3) return;
-        const [evYear, evMonth, evDay] = parts;
-        if (evMonth - 1 !== m) return;
-        if (evYear !== now.getFullYear()) return;
-        entries.push({ event: ev, type: type, day: evDay, dateStr: ev.date });
-      });
-      continue;
-    }
-
-    const field = fieldMap[type];
-    for (const mm of calMembers) {
-      const d = mm[field];
-      if (!d) continue;
-      const dateStr = String(d);
-      if (!dateStr) continue;
-      const parts = dateStr.split('-');
-      let eventMonth, eventDay;
-      if (parts.length === 3) {
-        eventMonth = parseInt(parts[1]) - 1;
-        eventDay = parseInt(parts[2]);
-      } else if (parts.length === 2) {
-        eventMonth = parseInt(parts[0]) - 1;
-        eventDay = parseInt(parts[1]);
-      } else {
-        continue;
-      }
-      if (eventMonth !== m) continue;
-      entries.push({ m: mm, d, type, day: eventDay });
-    }
-  }
-
-  entries.sort((a, b) => a.day - b.day);
-  if (!entries.length) {
-    grid.innerHTML = '<div class="muted">No matching entries for this month.</div>';
-    return;
-  }
-
-  for (const ent of entries) {
-    const card = document.createElement('div');
-    card.className = 'card';
-
-    if (ent.type === 'event' || ent.type === 'service' || ent.type === 'choir' || ent.type === 'praise') {
-  const typeLabels = { service: 'Order of Service', choir: 'Choir', praise: 'Praise Team', event: 'Event' };
-  const typeIcons = { service: '📋 ', choir: '🎵 ', praise: '🎤 ', event: '📅 ' };
-  const typeLabel = typeLabels[ent.event.type] || 'Event';
-  const typeIcon = typeIcons[ent.event.type] || '📅 ';
-	card.innerHTML = `
-	  <div class="name">${typeIcon}${ent.event.title}</div>
-    <div class="muted">${typeLabel}: ${fmtLongDate(ent.event.date)}${ent.event.endDate ? ` – ${fmtLongDate(ent.event.endDate)}` : ''}</div>
-    ${ent.event.notes ? `<div class="muted" style="margin-top:6px;white-space:pre-wrap">${ent.event.notes}</div>` : ''}
-    <div class="actions" style="margin-top:10px">
-      <button class="btn btn-sm">Edit</button>
-    </div>
-  `;
-  card.querySelector('button').addEventListener('click', () => openEventModal(ent.event));
-} else {
-      card.innerHTML = `
-        <div class="name">${memberLabel(ent.m)}</div>
-        <div class="muted">${labelMap[ent.type]}: ${getBirthdayDisplay({birthDate: ent.d})}</div>
-        <div class="actions" style="margin-top:10px">
-          <button class="btn btn-sm">View</button>
-        </div>
-      `;
-      card.querySelector('button').addEventListener('click', () => viewCard(ent.m));
-    }
-
-    grid.appendChild(card);
-  }
-}
-
 function renderCalendarGrid() {
   const calMembers = getCalendarMembers();
 
@@ -4482,7 +3509,6 @@ dayNames.forEach(day => {
 }
 
 
-
 function showPrintRangeDialog(title) {
   return new Promise(resolve => {
     document.getElementById('printRangeTitle').textContent = title;
@@ -4559,7 +3585,6 @@ if (!list.length) {
 });
 
 
-
 $('printChoirListBtn').addEventListener('click', async () => {
   const range = await showPrintRangeDialog('Print Choir Schedule');
   if (range === null) return;
@@ -4621,8 +3646,6 @@ $('printPraiseListBtn').addEventListener('click', async () => {
 });
 
 
-
-
 /********** Bulk Operations **********/
 
 $('delSelectedBtn').onclick = async () => {
@@ -4650,7 +3673,6 @@ $('delSelectedBtn').onclick = async () => {
 
   members = await idbGetAll('members');
   refreshMembersDatalist();
-  syncMembersToLocalStorage();
   renderMembers();
 };
 
@@ -4660,94 +3682,6 @@ $('delSelectedBtn').onclick = async () => {
   - File System Access APIs (showDirectoryPicker) are not consistently available in Electron renderers.
   - To keep Import/Export All reliable, we use a single JSON file download/upload flow that works in Chrome + Electron.
 */
-
-async function exportAllDataToJsonFile(){
-  try{
-    if (!isAdmin) { alert('Enabled.'); return; }
-
-    const members = await idbGetAll('members');
-    const ministries = await idbGetAll('ministries');
-    const meta = await idbGetAll('meta');
-    const auth = await idbGetAll('auth');
-    const events = await idbGetAll('events');
-
-    const data = {
-      exportedAt: new Date().toISOString(),
-      app: 'livingword',
-      version: 1,
-      members: members || [],
-      ministries: ministries || [],
-      meta: meta || [],
-      auth: auth || [],
-      events: events || []
-    };
-
-    const blob = new Blob([JSON.stringify(data, null, 2)], { type:'application/json' });
-    const a = document.createElement('a');
-    a.href = URL.createObjectURL(blob);
-    a.download = 'livingword_backup.json';
-    document.body.appendChild(a);
-    a.click();
-    setTimeout(()=>{ URL.revokeObjectURL(a.href); a.remove(); }, 0);
-
-    alert('✅ Exported all data to JSON.');
-	
-	appendMemberActivity({
-  action: 'member_data_exported',
-  entityType: 'system',
-  entityId: 'export',
-  summary: 'Member Profiles data exported',
-  details: {}
-});
-	
-  }catch(err){
-    console.error('Export failed:', err);
-    alert('❌ Export failed. See console for details.');
-  }
-}
-
-async function importAllDataFromFile(file){
-  try{
-    if (!isAdmin) { alert('Enabled.'); return; }
-    if (!file) return;
-
-    const text = await file.text();
-    const json = JSON.parse(text || '{}');
-
-    // Clear stores first (works in both Electron and IndexedDB mode)
-    await clearStore('members');
-    await clearStore('ministries');
-    await clearStore('meta');
-    await clearStore('auth');
-    await clearStore('events');
-
-    if (Array.isArray(json.members)) await idbPutMany('members', json.members);
-    if (Array.isArray(json.ministries)) await idbPutMany('ministries', json.ministries);
-    if (Array.isArray(json.meta)) await idbPutMany('meta', json.meta);
-    if (Array.isArray(json.auth)) await idbPutMany('auth', json.auth);
-    if (Array.isArray(json.events)) await idbPutMany('events', json.events);
-
-    alert('✅ Import complete from JSON backup.');
-	
-	appendMemberActivity({
-  action: 'member_data_imported',
-  entityType: 'system',
-  entityId: 'import',
-  summary: 'Member Profiles data imported',
-  details: {}
-});
-
-    // Reload in-memory state
-    MINISTRIES = await idbGetAll('ministries');
-    members = await idbGetAll('members');
-    loadMinistryManager();
-    renderMembers();
-  }catch(err){
-    console.error('Import failed:', err);
-    alert('❌ Import failed. Ensure you selected a valid livingword_backup.json file.');
-  }
-}
-
 
 
 /********** Auth **********/
@@ -4814,72 +3748,9 @@ function toggleMaintenanceMode() {
   try { loadMinistryManager(); } catch (e) {}
 }
 
-async function getPassword(){ const r=await idbGet('auth','pw'); return r?.val || 'admin';}
-async function setPassword(pw){ await idbPut('auth',{key:'pw', val:pw}); }
-function reflectAuth() {
-  // Roles/login removed. Just keep the UI consistent with Maintenance Mode.
-  updateMaintenanceUI();
-}
-
-if ($('loginBtn')) $('loginBtn').addEventListener('click', ()=> $('loginModal').showModal());
-if ($('cancelLoginBtn')) $('cancelLoginBtn').addEventListener('click', ()=> $('loginModal').close());
-if ($('doLoginBtn')) $('doLoginBtn').addEventListener('click', async ()=>{
-  if (!window.idbReady) {
-    alert("Please wait… loading database.");
-    return;
-  }
-
-  const pw = $('loginPw').value.trim();
-  const saved = await getPassword();
-
-  if (pw === saved) {
-    isAdmin = true;
-    reflectAuth();
-    $('loginModal').close();
-
-    const visibleSection = document.querySelector('main section:not([style*="display:none"])');
-    if (visibleSection) {
-      const id = visibleSection.id;
-      if (id === 'membersView') renderMembers();
-      if (id === 'ministriesUnified') loadMinistryManager();
-      if (id === 'calendarView') renderCalendar();
-    }
-
-    alert('You are now logged in as Admin.');
-  } 
-  else {
-    alert('Incorrect password');
-  }
-});
-
-function doLogout() {
-  // Login/admin removed: no-op.
-  isAdmin = true;
-  reflectAuth();
-}
-
-// Top-nav shortcuts
-if ($('changePwTopBtn')) {
-  if ($('changePwTopBtn')) $('changePwTopBtn').addEventListener('click', () => $('changePwModal').showModal());
-}
-if ($('logoutTopBtn')) {
-  if ($('logoutTopBtn')) $('logoutTopBtn').addEventListener('click', doLogout);
-}
 if ($('maintenanceTopBtn')) {
   if ($('maintenanceTopBtn')) $('maintenanceTopBtn').addEventListener('click', toggleMaintenanceMode);
 }
-
-if ($('cancelPwBtn')) $('cancelPwBtn').addEventListener('click', ()=> $('changePwModal').close());
-if ($('doChangePwBtn')) $('doChangePwBtn').addEventListener('click', async ()=>{
-  const oldp=$('oldPw').value, newp=$('newPw').value;
-  if((await getPassword())!==oldp){ alert('Current password invalid'); return; }
-  if(!newp){ alert('New password required'); return; }
-  await setPassword(newp);
-  $('changePwModal').close();
-  alert('Password updated.');
-});
-
-
 
 
 /********** Ministry Manager **********/
@@ -5033,11 +3904,6 @@ async function deleteMinistry(index) {
 
 /********** Boot **********/
 async function boot(){
-  // Load persisted maintenance mode
-  try {
-    const r = await window.dataApi?.getAppSetting?.('maintenanceMode');
-    maintenanceMode = (r?.value === '1' || r?.value === true);
-  } catch (_) { maintenanceMode = false; }
   try { updateMaintenanceUI(); } catch(_) {}
 
   // Initialize Supabase if credentials exist, otherwise show setup screen
@@ -5055,18 +3921,12 @@ const storedMins = await idbGetAll('ministries');
   else { await idbPutMany('ministries', MINISTRIES); }
 
   members = await idbGetAll('members');
-  if(!members.length){
-    await idbPutMany('members', sampleMembers());
-    members = await idbGetAll('members');
-  }
 
   // Load calendar events
   await loadCalendarEvents();
   refreshMinistriesSelect();
   refreshMembersDatalist();
 
-  syncMembersToLocalStorage();
-  reflectAuth();
   window.idbReady = true;
   renderMembers();
 
@@ -5083,51 +3943,9 @@ let songs = [];
 let musicSched = [];
 let musicWeekOffset = 0; // weeks from current week
 
-async function migrateMusicDataToSqlite() {
-  if (!IS_ELECTRON) return;
-  const migrationKey = 'music_idb_migrated_v1';
-  try {
-    const already = await window.appApi.getConfig?.();
-    // Use a settings flag to only migrate once
-    const flag = localStorage.getItem(migrationKey);
-    if (flag) return;
-
-    // Read existing IDB data directly (before ELECTRON_BACKED_STORES takes over)
-    const idbSongs = await new Promise((res) => {
-      if (!idb) { res([]); return; }
-      const t = idb.transaction(['songs'], 'readonly');
-      const r = t.objectStore('songs').getAll();
-      r.onsuccess = () => res(r.result || []);
-      r.onerror = () => res([]);
-    });
-    const idbSched = await new Promise((res) => {
-      if (!idb) { res([]); return; }
-      const t = idb.transaction(['musicSched'], 'readonly');
-      const r = t.objectStore('musicSched').getAll();
-      r.onsuccess = () => res(r.result || []);
-      r.onerror = () => res([]);
-    });
-
-    // Write to SQLite if IDB had data
-    if (idbSongs.length) {
-      for (const s of idbSongs) await window.membersApi.put('songs', s);
-      console.log(`✅ Migrated ${idbSongs.length} songs to SQLite`);
-    }
-    if (idbSched.length) {
-      for (const s of idbSched) await window.membersApi.put('musicSched', s);
-      console.log(`✅ Migrated ${idbSched.length} music schedule records to SQLite`);
-    }
-
-    localStorage.setItem(migrationKey, '1');
-  } catch (e) {
-    console.warn('Music IDB migration skipped:', e.message);
-  }
-}
-
 async function loadMusicData() {
   if (!idb) idb = await idbOpen();
-  if (IS_ELECTRON) await migrateMusicDataToSqlite();
-  songs = await idbGetAll('songs');
+  if (IS_ELECTRON)  songs = await idbGetAll('songs');
   musicSched = await idbGetAll('musicSched');
 }
 
@@ -6901,7 +5719,6 @@ $('musicPrevWeekBtn')?.addEventListener('click', async () => { musicWeekOffset--
     btn.textContent = isHidden ? '▼ Hide Hidden Services' : '▶ Show Hidden Services';
   });
   $('musicNextWeekBtn')?.addEventListener('click', async () => { musicWeekOffset++; await loadMusicData(); renderMusicSchedule(); });
-  $('exportMusicBtn')?.addEventListener('click', exportMusicData);
   $('importMusicInput')?.addEventListener('change', e => {
     importMusicData(e.target.files[0]);
     e.target.value = '';
