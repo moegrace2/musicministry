@@ -493,6 +493,7 @@ body.maintenance .toolbar-row.edit-only{display:flex;}
     <button class="active" data-view="membersView">Members</button>
     <button data-view="ministriesUnified">Ministries</button>
     <button data-view="musicView">Schedules</button>
+    <button data-view="rehearsalView">Rehearsal</button>
     <button data-view="songLibraryView">Song Library</button>
     <button data-view="songHistoryView">Song History</button>
     <button data-view="calendarView">Calendar</button>
@@ -598,12 +599,6 @@ body.maintenance .toolbar-row.edit-only{display:flex;}
 <section id="musicView" style="display:none">
   <h2 class="section-title">Music Ministry</h2>
 
-  <!-- Sub-tabs -->
-  <div style="display:flex;gap:8px;margin-bottom:20px">
-    <button class="btn musicTab active" data-tab="scheduleTab">Schedule</button>
-    <button class="btn musicTab" data-tab="rehearsalTab">Rehearsal</button>
-  </div>
-
   <!-- Schedule Tab -->
   <div id="scheduleTab">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;flex-wrap:wrap;gap:10px">
@@ -613,6 +608,7 @@ body.maintenance .toolbar-row.edit-only{display:flex;}
         <button class="btn" id="musicNextWeekBtn">›</button>
       </div>
       <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <button class="btn success" id="autoAssignBtn">✨ Auto-Assign Songs</button>
         <button class="btn" id="exportMusicBtn">⬇ Export Music Data</button>
         <label class="btn" style="cursor:pointer;margin:0">⬆ Import Music Data<input type="file" id="importMusicInput" accept=".json" style="display:none"/></label>
         <button class="btn primary" id="printMusicScheduleBtn">🖨 Print</button>
@@ -627,14 +623,19 @@ body.maintenance .toolbar-row.edit-only{display:flex;}
     <div id="specialServicesSection" style="display:none"></div>
   </div>
 
-  <!-- Song History Tab (now a standalone page) -->
+  <!-- Song History Tab (stub - now a standalone page) -->
   <div id="historyTab" style="display:none"></div>
 
-  <!-- Songs Library Tab (now a standalone page) -->
+  <!-- Songs Library Tab (stub - now a standalone page) -->
   <div id="libraryTab" style="display:none"></div>
 
-  <!-- Rehearsal Tab -->
-  <div id="rehearsalTab" style="display:none">
+  <!-- Rosters Tab (stub - now in Ministries page) -->
+  <div id="rostersTab" style="display:none"></div>
+</section>
+
+<section id="rehearsalView" style="display:none">
+  <h2 class="section-title">Rehearsal</h2>
+  <div id="rehearsalTab">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;flex-wrap:wrap;gap:10px">
       <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
         <div>
@@ -690,15 +691,6 @@ body.maintenance .toolbar-row.edit-only{display:flex;}
       <textarea id="rehearsalNotes" rows="5" placeholder="Announcements, prayer requests, attendance notes…" style="width:100%;resize:vertical" oninput="const g=$('rehearsalGroup')?.value||'choir'; localStorage.setItem('lw_rehearsal_notes_'+g, this.value); idbPut('rehearsalNotes', { id: 'notes_'+g, key: 'notes_'+g, value: this.value });"></textarea>
     </div>
   </div>
-
-  <!-- Song History Tab (stub - now a standalone page) -->
-  <div id="historyTab" style="display:none"></div>
-
-  <!-- Songs Library Tab (stub - now a standalone page) -->
-  <div id="libraryTab" style="display:none"></div>
-
-  <!-- Rosters Tab (stub - now in Ministries page) -->
-  <div id="rostersTab" style="display:none"></div>
 </section>
 
 <!-- Song History standalone section -->
@@ -847,6 +839,49 @@ body.maintenance .toolbar-row.edit-only{display:flex;}
 </dialog>
 
 <!-- Add/Edit Song Modal -->
+<dialog id="autoAssignModal" style="max-width:500px;width:100%;padding:28px;border-radius:16px;border:1px solid var(--border)">
+  <h3 style="margin:0 0 20px 0;font-size:18px">✨ Auto-Assign Songs</h3>
+  <div style="display:flex;flex-direction:column;gap:14px;margin-bottom:20px">
+    <div style="display:flex;gap:12px;flex-wrap:wrap">
+      <div style="flex:1;min-width:140px">
+        <label style="font-size:13px;font-weight:600;display:block;margin-bottom:4px">From (Sunday)</label>
+        <input type="date" id="autoAssignFrom" style="width:100%"/>
+      </div>
+      <div style="flex:1;min-width:140px">
+        <label style="font-size:13px;font-weight:600;display:block;margin-bottom:4px">To (Sunday)</label>
+        <input type="date" id="autoAssignTo" style="width:100%"/>
+      </div>
+    </div>
+    <div>
+      <label style="font-size:13px;font-weight:600;display:block;margin-bottom:6px">Fill mode</label>
+      <div style="display:flex;gap:8px">
+        <label style="display:flex;align-items:center;gap:6px;font-size:14px;cursor:pointer">
+          <input type="radio" name="autoAssignMode" value="empty" checked/> Empty slots only
+        </label>
+        <label style="display:flex;align-items:center;gap:6px;font-size:14px;cursor:pointer">
+          <input type="radio" name="autoAssignMode" value="overwrite"/> Overwrite all
+        </label>
+      </div>
+    </div>
+  </div>
+  <div id="autoAssignPreview" style="display:none;max-height:340px;overflow-y:auto;margin-bottom:16px;border:1px solid var(--border);border-radius:10px;padding:12px;font-size:13px;background:#f8fafc"></div>
+  <div id="autoAssignWarnings" style="display:none;background:#fff7ed;border:1px solid #fed7aa;border-radius:8px;padding:10px 14px;font-size:13px;color:#92400e;margin-bottom:14px"></div>
+  <div style="display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap">
+    <button class="btn" id="autoAssignCancelBtn">Cancel</button>
+    <button class="btn success" id="autoAssignPreviewBtn">Preview</button>
+    <button class="btn primary" id="autoAssignSaveBtn" style="display:none">Save Assignments</button>
+  </div>
+</dialog>
+
+<dialog id="autoAssignConflictModal" style="max-width:420px;width:100%;padding:24px;border-radius:16px;border:1px solid var(--border)">
+  <h3 style="margin:0 0 12px 0;font-size:16px">⚠️ Conflict</h3>
+  <p id="autoAssignConflictMsg" style="margin:0 0 20px 0;font-size:14px;line-height:1.5"></p>
+  <div style="display:flex;gap:8px;justify-content:flex-end">
+    <button class="btn" id="conflictSkipBtn">Skip this slot</button>
+    <button class="btn primary" id="conflictAssignAnywayBtn">Assign anyway</button>
+  </div>
+</dialog>
+
 <dialog id="songModal" style="max-width:440px;width:100%">
   <div class="modal-head" style="padding:24px 28px">
     <strong id="songModalTitle">Add Song</strong>
@@ -1663,13 +1698,14 @@ document.querySelectorAll('.nav button').forEach(btn=>{
       manageMinBtn.style.display = (to === 'ministriesUnified') ? '' : 'none';
     }
     
-    for (const sec of ['membersView','ministriesUnified','musicView','songLibraryView','songHistoryView','calendarView']) {
+    for (const sec of ['membersView','ministriesUnified','musicView','rehearsalView','songLibraryView','songHistoryView','calendarView']) {
       const el = $(sec);
       if (el) el.style.display = (sec === to) ? 'block' : 'none';
     }
     if(to==='membersView') renderMembers();
     if(to==='ministriesUnified') { loadMinistryManager(); renderRosters(); }
     if(to==='musicView') renderMusicMinistry();
+    if(to==='rehearsalView') renderRehearsalTab();
     if(to==='songLibraryView') renderSongLibrary();
     if(to==='songHistoryView') renderSongHistory();
     if(to==='calendarView') renderCalendar();
@@ -1691,13 +1727,14 @@ document.querySelectorAll('#mobileNav button').forEach(btn => {
     if (memberSearchEl) memberSearchEl.value = '';
     const manageMinBtn = $('manageMinHeaderBtn');
     if (manageMinBtn) manageMinBtn.style.display = (to === 'ministriesUnified') ? '' : 'none';
-    for (const sec of ['membersView','ministriesUnified','musicView','songLibraryView','songHistoryView','calendarView']) {
+    for (const sec of ['membersView','ministriesUnified','musicView','rehearsalView','songLibraryView','songHistoryView','calendarView']) {
       const el = $(sec);
       if (el) el.style.display = (sec === to) ? 'block' : 'none';
     }
     if(to==='membersView') renderMembers();
     if(to==='ministriesUnified') { loadMinistryManager(); renderRosters(); }
     if(to==='musicView') renderMusicMinistry();
+    if(to==='rehearsalView') renderRehearsalTab();
     if(to==='songLibraryView') renderSongLibrary();
     if(to==='songHistoryView') renderSongHistory();
     if(to==='calendarView') renderCalendar();
@@ -4684,6 +4721,427 @@ async function saveSchedService() {
   musicSched = await idbGetAll('musicSched');
   $('schedServiceModal').close();
   renderMusicSchedule();
+}
+
+// ---- Auto-Assign Songs ----
+
+document.getElementById('autoAssignBtn')?.addEventListener('click', () => {
+  // Default date range to current viewed month of Sundays
+  const today = new Date();
+  const thisSun = getSunday(today);
+  $('autoAssignFrom').value = toISO(thisSun);
+  const fourWeeks = new Date(thisSun);
+  fourWeeks.setDate(fourWeeks.getDate() + 21);
+  $('autoAssignTo').value = toISO(fourWeeks);
+  $('autoAssignPreview').style.display = 'none';
+  $('autoAssignWarnings').style.display = 'none';
+  $('autoAssignSaveBtn').style.display = 'none';
+  $('autoAssignModal').showModal();
+});
+
+document.getElementById('autoAssignCancelBtn')?.addEventListener('click', () => {
+  $('autoAssignModal').close();
+});
+
+document.getElementById('autoAssignPreviewBtn')?.addEventListener('click', async () => {
+  await runAutoAssign(false);
+});
+
+document.getElementById('autoAssignSaveBtn')?.addEventListener('click', async () => {
+  await runAutoAssign(true);
+});
+
+// Pending assignments built during preview; saved on confirm
+let _autoAssignPending = [];
+let _conflictQueue = [];
+let _conflictResolutions = {}; // date_serviceType -> 'skip' | 'assign'
+
+async function runAutoAssign(save) {
+  const fromVal = $('autoAssignFrom').value;
+  const toVal = $('autoAssignTo').value;
+  if (!fromVal || !toVal) { alert('Please select a date range.'); return; }
+
+  const mode = document.querySelector('input[name="autoAssignMode"]:checked')?.value || 'empty';
+
+  // Collect all Sundays in range
+  const sundays = [];
+  let cur = new Date(fromVal + 'T00:00:00');
+  const end = new Date(toVal + 'T00:00:00');
+  // Snap to Sunday
+  cur.setDate(cur.getDate() - cur.getDay());
+  end.setDate(end.getDate() - end.getDay());
+  while (cur <= end) {
+    sundays.push(toISO(new Date(cur)));
+    cur.setDate(cur.getDate() + 7);
+  }
+
+  if (sundays.length === 0) { alert('No Sundays found in that range.'); return; }
+
+  // Build full history for lookback (last 8 weeks before range start)
+  const lookbackCutoff = new Date(fromVal + 'T00:00:00');
+  lookbackCutoff.setDate(lookbackCutoff.getDate() - 56); // 8 weeks
+  const lookbackIso = toISO(lookbackCutoff);
+
+  // recentlyUsed: songId -> last used date string
+  const recentlyUsed = {};
+  musicSched.forEach(s => {
+    if (s.date < fromVal) {
+      (s.slots || []).forEach(sl => {
+        if (sl.songId) {
+          if (!recentlyUsed[sl.songId] || s.date > recentlyUsed[sl.songId]) {
+            recentlyUsed[sl.songId] = s.date;
+          }
+        }
+      });
+    }
+  });
+
+// leaderLastSung: leaderName -> last sunday date they sang (before range)
+  const leaderLastSung = {};
+  musicSched.forEach(s => {
+    if (s.date < fromVal) {
+      (s.slots || []).forEach(sl => {
+        [sl.leader, sl.leader2].filter(Boolean).forEach(ldr => {
+          if (!leaderLastSung[ldr] || s.date > leaderLastSung[ldr]) {
+            leaderLastSung[ldr] = s.date;
+          }
+        });
+      });
+    }
+  });
+
+  // praiseLeaderLastNight: leaderName -> last Praise Team night date they led
+  const praiseLeaderLastNight = {};
+  musicSched.forEach(s => {
+    if (s.date < fromVal && s.nightGroupOverride === 'Praise Team') {
+      (s.slots || []).forEach(sl => {
+        [sl.leader, sl.leader2].filter(Boolean).forEach(ldr => {
+          if (!praiseLeaderLastNight[ldr] || s.date > praiseLeaderLastNight[ldr]) {
+            praiseLeaderLastNight[ldr] = s.date;
+          }
+        });
+      });
+    }
+  });
+
+  // sectionLastLeader: 'Section 1' | 'Section 2' -> leaderName of last person who led that section night
+  const sectionLastLeader = { 'Section 1': null, 'Section 2': null };
+  ['Section 1', 'Section 2'].forEach(sec => {
+    const pastNights = musicSched
+      .filter(s => s.date < fromVal && s.nightGroupOverride === sec)
+      .sort((a, b) => b.date.localeCompare(a.date));
+    if (pastNights.length > 0) {
+      const lastSlot = (pastNights[0].slots || [])[0];
+      if (lastSlot) sectionLastLeader[sec] = lastSlot.leader || null;
+    }
+  });
+
+  _autoAssignPending = [];
+  _conflictResolutions = {};
+  const warnings = [];
+
+  // Process each Sunday
+  for (let i = 0; i < sundays.length; i++) {
+    const iso = sundays[i];
+    const prevIso = i > 0 ? sundays[i - 1] : null;
+
+    // --- Morning (choir, 2 slots) ---
+    const existingMorn = musicSched.find(s => s.date === iso && (s.serviceType === 'morning' || s.serviceType === 'special_morning'));
+    const mornSlots = existingMorn?.slots || [];
+    const needsMorn = mornSlots.filter(sl => !sl.songId || !sl.songTitle);
+    const fillMorn = mode === 'overwrite' ? [0, 1] : [0, 1].filter(idx => {
+      const sl = mornSlots[idx];
+      return !sl || !sl.songId || !sl.songTitle;
+    });
+
+    // Build what leaders sang morning of this same Sunday (for same-day check)
+    const mornLeadersToday = new Set();
+
+    if (fillMorn.length > 0) {
+      const choirSongs = songs.filter(s => (s.type || 'choir') === 'choir');
+      const result = pickMorningSongs(choirSongs, iso, prevIso, leaderLastSung, recentlyUsed, lookbackIso, warnings, iso);
+      const newSlots = existingMorn ? [...(existingMorn.slots || [])] : [];
+      result.forEach((picked, idx) => {
+        const slotIdx = fillMorn[idx];
+        if (slotIdx === undefined || !picked) return;
+        while (newSlots.length <= slotIdx) newSlots.push({});
+        newSlots[slotIdx] = {
+          songId: picked.id,
+          songTitle: picked.title,
+          leader: picked.leaderName || '',
+          leader2: picked.leader2Name || '',
+          key: picked.key || ''
+        };
+        [picked.leaderName, picked.leader2Name].filter(Boolean).forEach(l => mornLeadersToday.add(l));
+        // Update tracking for subsequent Sundays
+        recentlyUsed[picked.id] = iso;
+        [picked.leaderName, picked.leader2Name].filter(Boolean).forEach(l => { leaderLastSung[l] = iso; });
+      });
+      _autoAssignPending.push({
+        date: iso,
+        serviceType: existingMorn?.serviceType || 'morning',
+        existingId: existingMorn?.id || null,
+        slots: newSlots,
+        nightGroupOverride: existingMorn?.nightGroupOverride
+      });
+    }
+
+    // --- Night (section or praise team, 1 slot) ---
+    const existingNight = musicSched.find(s => s.date === iso && (s.serviceType === 'night' || s.serviceType === 'special_night'));
+    const nightGroup = existingNight?.nightGroupOverride || getNightRotationGroupDynamic(new Date(iso + 'T00:00:00'));
+    const nightSlots = existingNight?.slots || [];
+    const fillNight = mode === 'overwrite' ? true : (!nightSlots[0]?.songId || !nightSlots[0]?.songTitle);
+
+    if (fillNight) {
+      const isPraise = nightGroup === 'Praise Team';
+      const nightSongs = songs.filter(s => isPraise ? (s.type === 'praise') : ((s.type || 'choir') === 'choir'));
+      const picked = pickNightSong(nightSongs, iso, prevIso, leaderLastSung, recentlyUsed, lookbackIso, mornLeadersToday, isPraise, nightGroup, praiseLeaderLastNight, sectionLastLeader, warnings);
+      if (picked) {
+        const newNightSlots = existingNight ? [...(existingNight.slots || [])] : [];
+        while (newNightSlots.length < 1) newNightSlots.push({});
+        newNightSlots[0] = {
+          songId: picked.id,
+          songTitle: picked.title,
+          leader: picked.leaderName || '',
+          leader2: picked.leader2Name || '',
+          key: picked.key || ''
+        };
+        recentlyUsed[picked.id] = iso;
+        [picked.leaderName, picked.leader2Name].filter(Boolean).forEach(l => { leaderLastSung[l] = iso; });
+        // Update rotation trackers for subsequent Sundays within the range
+        if (isPraise) {
+          [picked.leaderName, picked.leader2Name].filter(Boolean).forEach(l => { praiseLeaderLastNight[l] = iso; });
+        } else {
+          sectionLastLeader[nightGroup] = picked.leaderName || null;
+        }
+        _autoAssignPending.push({
+          date: iso,
+          serviceType: existingNight?.serviceType || 'night',
+          existingId: existingNight?.id || null,
+          nightGroupOverride: nightGroup,
+          slots: newNightSlots
+        });
+      }
+    }
+  }
+
+  // Show preview
+  if (!save) {
+    showAutoAssignPreview(_autoAssignPending, warnings);
+    $('autoAssignSaveBtn').style.display = '';
+  } else {
+    // Save all
+    for (const pending of _autoAssignPending) {
+      const existing = pending.existingId ? musicSched.find(s => s.id === pending.existingId) : null;
+      const rec = {
+        id: existing ? existing.id : nextSchedId(),
+        date: pending.date,
+        serviceType: pending.serviceType,
+        ...(pending.nightGroupOverride ? { nightGroupOverride: pending.nightGroupOverride } : {}),
+        slots: pending.slots
+      };
+      await idbPut('musicSched', rec);
+    }
+    musicSched = await idbGetAll('musicSched');
+    $('autoAssignModal').close();
+    renderMusicSchedule();
+    alert(`✅ Auto-assigned songs for ${sundays.length} Sunday(s).`);
+  }
+}
+
+function pickMorningSongs(pool, iso, prevIso, leaderLastSung, recentlyUsed, lookbackIso, warnings, todayIso) {
+  // Prefer songs not used in 8 weeks
+  const fresh = pool.filter(s => !recentlyUsed[s.id] || recentlyUsed[s.id] < lookbackIso);
+  const fallback = pool;
+
+  // Leader conflict: didn't sing last Sunday
+  function leaderOkLastWeek(song) {
+    const leaders = [song.leaderName, song.leader2Name].filter(Boolean);
+    if (!prevIso) return true;
+    return leaders.every(l => leaderLastSung[l] !== prevIso);
+  }
+
+  // Tempo combo: not 2 fast, not 2 slow
+  function tempoComboOk(song1, song2) {
+    const t1 = (song1.tempo || '').toLowerCase();
+    const t2 = (song2.tempo || '').toLowerCase();
+    if (t1 === 'fast' && t2 === 'fast') return false;
+    if (t1 === 'slow' && t2 === 'slow') return false;
+    return true;
+  }
+
+  function scorePool(p) {
+    return p.filter(s => leaderOkLastWeek(s));
+  }
+
+  const eligible = scorePool(fresh).length >= 2 ? scorePool(fresh) : scorePool(fallback);
+  if (eligible.length === 0) {
+    // Last resort: ignore leader constraint
+    warnings.push(`⚠️ ${iso} Morning: Not enough leaders available — assigned anyway.`);
+    const anyTwo = pickTempoCombo(pool, null, warnings, iso, 'Morning');
+    return anyTwo;
+  }
+
+  return pickTempoCombo(eligible, pool, warnings, iso, 'Morning');
+}
+
+function pickTempoCombo(eligible, fallback, warnings, iso, label) {
+  // Shuffle for randomness
+  const shuffled = eligible.slice().sort(() => Math.random() - 0.5);
+
+  // Check if two songs share a primary leader
+  function differentLeaders(s1, s2) {
+    const l1 = s1.leaderName || '';
+    const l2 = s2.leaderName || '';
+    return !l1 || !l2 || l1 !== l2;
+  }
+
+  // Try slow+mid, slow+fast, mid+fast combos first — with different leaders
+  const preferred = [['slow','mid'],['slow','fast'],['mid','fast'],['mid','slow'],['fast','slow'],['fast','mid']];
+  for (const [t1, t2] of preferred) {
+    const s1 = shuffled.find(s => (s.tempo||'').toLowerCase() === t1);
+    if (!s1) continue;
+    const s2 = shuffled.find(s => s !== s1 && (s.tempo||'').toLowerCase() === t2 && differentLeaders(s1, s));
+    if (s2) return [s1, s2];
+  }
+  // Fallback: any 2 different songs that don't violate tempo rule or same leader
+  for (let i = 0; i < shuffled.length; i++) {
+    for (let j = i + 1; j < shuffled.length; j++) {
+      const t1 = (shuffled[i].tempo || '').toLowerCase();
+      const t2 = (shuffled[j].tempo || '').toLowerCase();
+      if (!((t1 === 'fast' && t2 === 'fast') || (t1 === 'slow' && t2 === 'slow')) && differentLeaders(shuffled[i], shuffled[j])) {
+        return [shuffled[i], shuffled[j]];
+      }
+    }
+  }
+  // Relax leader constraint — try tempo rule only
+  for (let i = 0; i < shuffled.length; i++) {
+    for (let j = i + 1; j < shuffled.length; j++) {
+      const t1 = (shuffled[i].tempo || '').toLowerCase();
+      const t2 = (shuffled[j].tempo || '').toLowerCase();
+      if (!((t1 === 'fast' && t2 === 'fast') || (t1 === 'slow' && t2 === 'slow'))) {
+        warnings.push(`⚠️ ${iso} ${label}: Could not avoid same leader for both songs.`);
+        return [shuffled[i], shuffled[j]];
+      }
+    }
+  }
+  // Last resort: pick any 2
+  if (shuffled.length >= 2) {
+    warnings.push(`⚠️ ${iso} ${label}: Could not find ideal tempo combo — assigned best available.`);
+    return [shuffled[0], shuffled[1]];
+  }
+  if (shuffled.length === 1) {
+    warnings.push(`⚠️ ${iso} ${label}: Only 1 song available.`);
+    return [shuffled[0]];
+  }
+  if (fallback) {
+    const fb = fallback.slice().sort(() => Math.random() - 0.5);
+    if (fb.length >= 2) {
+      warnings.push(`⚠️ ${iso} ${label}: Used recently-sung songs as fallback.`);
+      return [fb[0], fb[1]];
+    }
+  }
+  warnings.push(`⚠️ ${iso} ${label}: Not enough songs in library to fill slot.`);
+  return [];
+}
+
+function pickNightSong(pool, iso, prevIso, leaderLastSung, recentlyUsed, lookbackIso, mornLeadersToday, isPraise, nightGroup, praiseLeaderLastNight, sectionLastLeader, warnings) {
+  const fresh = pool.filter(s => !recentlyUsed[s.id] || recentlyUsed[s.id] < lookbackIso);
+  const workingPool = (fresh.length > 0 ? fresh : pool).slice().sort(() => Math.random() - 0.5);
+
+  // Hard rule: didn't lead the previous Sunday overall
+  function notLastSunday(song) {
+    if (!prevIso) return true;
+    return [song.leaderName, song.leader2Name].filter(Boolean).every(l => leaderLastSung[l] !== prevIso);
+  }
+
+  if (isPraise) {
+    // --- Praise Team rotation ---
+    // Sort by who led least recently across praise nights (round-robin)
+    const sorted = workingPool.slice().sort((a, b) => {
+      const aDate = praiseLeaderLastNight[a.leaderName] || '0000-00-00';
+      const bDate = praiseLeaderLastNight[b.leaderName] || '0000-00-00';
+      return aDate.localeCompare(bDate); // oldest first
+    });
+
+    // Strict: oldest in rotation + didn't sing last Sunday + didn't sing morning
+    let pick = sorted.find(s =>
+      notLastSunday(s) &&
+      ![s.leaderName, s.leader2Name].filter(Boolean).some(l => mornLeadersToday.has(l))
+    );
+    // Relax: drop morning constraint
+    if (!pick) pick = sorted.find(s => notLastSunday(s));
+    // Relax: drop last-Sunday constraint too
+    if (!pick) {
+      pick = sorted[0];
+      if (pick) warnings.push(`⚠️ ${iso} Night (Praise Team): All leaders sang recently — assigned next in rotation anyway.`);
+    }
+    if (!pick) {
+      warnings.push(`⚠️ ${iso} Night: No praise team songs available.`);
+      return null;
+    }
+    return pick;
+
+  } else {
+    // --- Section 1 / Section 2 rotation ---
+    const lastLeaderForSection = sectionLastLeader[nightGroup] || null;
+
+    // Strict: different leader than last time this section sang + didn't sing last Sunday
+    let pick = workingPool.find(s =>
+      notLastSunday(s) &&
+      s.leaderName !== lastLeaderForSection
+    );
+    // Relax: allow same leader as last section night if no other option
+    if (!pick) {
+      pick = workingPool.find(s => notLastSunday(s));
+      if (pick) warnings.push(`⚠️ ${iso} Night (${nightGroup}): No leader change available — same leader as last time.`);
+    }
+    // Relax: drop last-Sunday constraint too
+    if (!pick) {
+      pick = workingPool.find(s => s.leaderName !== lastLeaderForSection);
+      if (pick) warnings.push(`⚠️ ${iso} Night (${nightGroup}): Leader sang last Sunday but no alternative found.`);
+    }
+    if (!pick) {
+      pick = workingPool[0];
+      if (pick) warnings.push(`⚠️ ${iso} Night (${nightGroup}): Could not satisfy any leader rotation rule — assigned best available.`);
+    }
+    if (!pick) {
+      warnings.push(`⚠️ ${iso} Night: No choir songs available for ${nightGroup}.`);
+      return null;
+    }
+    return pick;
+  }
+}
+
+function showAutoAssignPreview(pending, warnings) {
+  const preview = $('autoAssignPreview');
+  const warnBox = $('autoAssignWarnings');
+
+  if (pending.length === 0) {
+    preview.innerHTML = '<em style="color:var(--muted)">No slots to fill in this range.</em>';
+    preview.style.display = 'block';
+    return;
+  }
+
+  const rows = pending.map(p => {
+    const label = p.serviceType === 'morning' || p.serviceType === 'special_morning'
+      ? 'Sunday Morning'
+      : `Sunday Night — ${p.nightGroupOverride || ''}`;
+    const slotLines = (p.slots || []).map(sl =>
+      sl.songTitle ? `<div style="padding:2px 0 2px 12px;color:#1e293b">🎵 <strong>${sl.songTitle}</strong>${sl.leader ? ` · ${sl.leader}` : ''}${sl.leader2 ? ` & ${sl.leader2}` : ''}</div>` : ''
+    ).join('');
+    return `<div style="margin-bottom:10px"><div style="font-weight:700;color:var(--blue)">${fmtDate(new Date(p.date + 'T00:00:00'))} · ${label}</div>${slotLines}</div>`;
+  }).join('');
+
+  preview.innerHTML = rows;
+  preview.style.display = 'block';
+
+  if (warnings.length > 0) {
+    warnBox.innerHTML = '<strong>Heads up:</strong><br>' + warnings.join('<br>');
+    warnBox.style.display = 'block';
+  } else {
+    warnBox.style.display = 'none';
+  }
 }
 
 // ---- Rehearsal Tab ----
