@@ -927,6 +927,14 @@ body.maintenance .toolbar-row.edit-only{display:flex;}
       </select>
     </div>
     <div>
+      <label>Status</label>
+      <select id="songStatus" style="display:block;margin-top:4px;width:100%">
+        <option value="active">Active (morning &amp; night)</option>
+        <option value="night">Night only</option>
+        <option value="retired">Retired (exclude from auto-assign)</option>
+      </select>
+    </div>
+    <div>
       <label>Default Leader</label>
       <select id="songLeader" style="display:block;margin-top:4px;width:100%"></select>
     </div>
@@ -4858,7 +4866,7 @@ async function runAutoAssign(save) {
     const mornLeadersToday = new Set();
 
     if (fillMorn.length > 0) {
-      const choirSongs = songs.filter(s => (s.type || 'choir') === 'choir');
+      const choirSongs = songs.filter(s => (s.type || 'choir') === 'choir' && s.status !== 'retired' && s.status !== 'night');
       const result = pickMorningSongs(choirSongs, iso, prevIso, leaderLastSung, recentlyUsed, lookbackIso, warnings, iso);
       const newSlots = existingMorn ? [...(existingMorn.slots || [])] : [];
       result.forEach((picked, idx) => {
@@ -4894,7 +4902,7 @@ async function runAutoAssign(save) {
 
     if (fillNight) {
       const isPraise = nightGroup === 'Praise Team';
-      const nightSongs = songs.filter(s => isPraise ? (s.type === 'praise') : ((s.type || 'choir') === 'choir'));
+      const nightSongs = songs.filter(s => isPraise ? (s.type === 'praise' && s.status !== 'retired') : ((s.type || 'choir') === 'choir' && s.status !== 'retired'));
       const picked = pickNightSong(nightSongs, iso, prevIso, leaderLastSung, recentlyUsed, lookbackIso, mornLeadersToday, isPraise, nightGroup, praiseLeaderLastNight, sectionLastLeader, warnings);
       if (picked) {
         const newNightSlots = existingNight ? [...(existingNight.slots || [])] : [];
@@ -5538,6 +5546,11 @@ function _renderSongLibrary() {
     const row = document.createElement('div');
     row.className = 'card';
     row.style.cssText = 'padding:14px 18px;display:flex;justify-content:space-between;align-items:center;gap:16px';
+    const statusBadge = song.status === 'retired'
+      ? `<span style="font-size:11px;padding:3px 10px;border-radius:999px;background:#fee2e2;color:#b91c1c;white-space:nowrap">Retired</span>`
+      : song.status === 'night'
+      ? `<span style="font-size:11px;padding:3px 10px;border-radius:999px;background:#eef2ff;color:#3730a3;white-space:nowrap">Night only</span>`
+      : '';
     row.innerHTML = `
       <div style="flex:1">
         <div style="font-weight:600">${song.title}</div>
@@ -5545,6 +5558,7 @@ function _renderSongLibrary() {
           ${song.key ? `Key: ${song.key}${song.modulations && song.modulations.length ? ' → ' + song.modulations.join(' → ') : ''} · ` : ''}Led by: ${song.leaderName || '—'}${song.leader2Name ? ` & ${song.leader2Name}` : ''} · Used ${timesUsed}× ${lastUsed ? `· Last: ${fmtLongDate(lastUsed)}` : ''}
         </div>
       </div>
+      ${statusBadge}
       <button class="btn btn-sm">Edit</button>
     `;
     row.querySelector('button').addEventListener('click', () => openSongModal(song));
@@ -5836,6 +5850,7 @@ function openSongModal(song, type) {
   (song && song.modulations ? song.modulations : []).forEach(k => addModulationRow(k));
   $('addModulationBtn').onclick = () => addModulationRow('');
   $('songTempo').value = song ? (song.tempo || '') : '';
+  $('songStatus').value = song ? (song.status || 'active') : 'active';
   $('songDeleteBtn').style.display = song ? '' : 'none';
 
   // Populate leader dropdowns filtered by song type
@@ -5879,7 +5894,8 @@ async function saveSong() {
     leader2Id,
     leader2Name: leader2Id === 'N/A' ? 'N/A' : (leader2Member ? memberLabel(leader2Member) : ''),
     type: $('songType').value || 'choir',
-    tempo: $('songTempo').value || ''
+    tempo: $('songTempo').value || '',
+    status: $('songStatus').value || 'active'
   };
   await idbPut('songs', rec);
   songs = await idbGetAll('songs');
