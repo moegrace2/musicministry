@@ -3485,11 +3485,15 @@ dayNames.forEach(day => {
 }
 
 
-function showPrintRangeDialog(title) {
+function showPrintRangeDialog(title, showServiceFilter = false) {
   return new Promise(resolve => {
     document.getElementById('printRangeTitle').textContent = title;
     document.getElementById('printRangeFrom').value = '';
     document.getElementById('printRangeTo').value = '';
+    const filterWrap = document.getElementById('printServiceFilterWrap');
+    const filterSelect = document.getElementById('printServiceFilter');
+    filterWrap.style.display = showServiceFilter ? 'block' : 'none';
+    filterSelect.value = 'all';
     const modal = document.getElementById('printRangeModal');
     const confirmBtn = document.getElementById('printRangeConfirm');
     const cancelBtn = document.getElementById('printRangeCancel');
@@ -3497,7 +3501,8 @@ function showPrintRangeDialog(title) {
       cleanup();
       resolve({
         from: document.getElementById('printRangeFrom').value || null,
-        to: document.getElementById('printRangeTo').value || null
+        to: document.getElementById('printRangeTo').value || null,
+        serviceFilter: showServiceFilter ? filterSelect.value : 'all'
       });
     }
     function onCancel() {
@@ -5968,7 +5973,7 @@ function populateMusicLeaderDropdowns() {
 }
 
 // Print music schedule
-async function printMusicSchedule(fromDate, toDate) {
+async function printMusicSchedule(fromDate, toDate, serviceFilter = 'all') {
   const { jsPDF } = window.jspdf;
   const doc = new jsPDF({ unit: 'pt', format: 'letter' });
   const decodeHtml = s => String(s || '').replace(/♭/g, 'b').replace(/&flat;/g, 'b').replace(/&#9837;/g, 'b');
@@ -6008,41 +6013,45 @@ async function printMusicSchedule(fromDate, toDate) {
     const effectivePrintGroup = nightSched?.nightGroupOverride || nightGroup;
     const dateLabel = fmtDate(sunday);
 
-    // Morning slots — date shown once, service shown once, no Song 1/2 labels
-    const mornSlots = mornSched?.slots || [];
-    mornSlots.forEach((slot, i) => {
-      const liveSong = songs.find(s => s.id === slot.songId);
-      const leaders = [liveSong?.leaderName || slot.leader, liveSong?.leader2Name].filter(l => l && l !== '—').join(' & ') || '—';
-      rows.push([
-        i === 0 ? dateLabel : '',
-        i === 0 ? mornLabel : '',
-        slot.songTitle || '—',
-        leaders,
-        decodeHtml(liveSong?.key || slot.key || '—')
-      ]);
-    });
-    if (!mornSlots.length) {
-      rows.push([dateLabel, mornLabel, '—', '—', '—']);
-    }
-
-    // Night slot
-    const nightSlots = nightSched?.slots || [];
-    if (noServiceFlag) {
-      rows.push(['', nightLabel, 'No service scheduled', '—', '—']);
-    } else {
-      nightSlots.forEach((slot, i) => {
+    // Morning slots
+    if (serviceFilter !== 'night') {
+      const mornSlots = mornSched?.slots || [];
+      mornSlots.forEach((slot, i) => {
         const liveSong = songs.find(s => s.id === slot.songId);
         const leaders = [liveSong?.leaderName || slot.leader, liveSong?.leader2Name].filter(l => l && l !== '—').join(' & ') || '—';
         rows.push([
-          i === 0 ? '' : '',
-          i === 0 ? nightLabel : '',
+          i === 0 ? dateLabel : '',
+          i === 0 ? mornLabel : '',
           slot.songTitle || '—',
           leaders,
           decodeHtml(liveSong?.key || slot.key || '—')
         ]);
       });
-      if (!nightSlots.length) {
-        rows.push(['', nightLabel, '—', '—', '—']);
+      if (!mornSlots.length) {
+        rows.push([dateLabel, mornLabel, '—', '—', '—']);
+      }
+    }
+
+    // Night slot
+    if (serviceFilter !== 'morning') {
+      const nightSlots = nightSched?.slots || [];
+      if (noServiceFlag) {
+        rows.push([serviceFilter === 'night' ? dateLabel : '', nightLabel, 'No service scheduled', '—', '—']);
+      } else {
+        nightSlots.forEach((slot, i) => {
+          const liveSong = songs.find(s => s.id === slot.songId);
+          const leaders = [liveSong?.leaderName || slot.leader, liveSong?.leader2Name].filter(l => l && l !== '—').join(' & ') || '—';
+          rows.push([
+            i === 0 && serviceFilter === 'night' ? dateLabel : '',
+            i === 0 ? nightLabel : '',
+            slot.songTitle || '—',
+            leaders,
+            decodeHtml(liveSong?.key || slot.key || '—')
+          ]);
+        });
+        if (!nightSlots.length) {
+          rows.push([serviceFilter === 'night' ? dateLabel : '', nightLabel, '—', '—', '—']);
+        }
       }
     }
   });
@@ -6160,9 +6169,9 @@ $('musicPrevWeekBtn')?.addEventListener('click', async () => { musicWeekOffset--
   const viewedSundays = getWeekSundays(musicWeekOffset);
   document.getElementById('printRangeFrom').value = toISO(viewedSundays[0]);
   document.getElementById('printRangeTo').value   = toISO(viewedSundays[viewedSundays.length - 1]);
-  const range = await showPrintRangeDialog('Print Music Schedule');
+  const range = await showPrintRangeDialog('Print Music Schedule', true);
   if (range === null) return;
-  printMusicSchedule(range.from, range.to);
+  printMusicSchedule(range.from, range.to, range.serviceFilter);
 });
   $('printHistoryBtn')?.addEventListener('click', printMusicHistory);
   $('historyFilterBtn')?.addEventListener('click', () => { renderSongHistory(); renderBySong(); populateMusicLeaderDropdowns(); });
@@ -6377,6 +6386,14 @@ $('musicPrevWeekBtn')?.addEventListener('click', async () => { musicWeekOffset--
         <label>To Date</label>
         <input type="date" id="printRangeTo" />
       </div>
+    </div>
+    <div id="printServiceFilterWrap" style="display:none;margin-top:14px;">
+      <label>Services to Include</label>
+      <select id="printServiceFilter" style="width:100%;">
+        <option value="all">All Services</option>
+        <option value="morning">Sunday Morning Only</option>
+        <option value="night">Sunday Night Only</option>
+      </select>
     </div>
   </div>
   <div class="modal-head" style="border-top:1px solid var(--border);border-bottom:none;border-radius:0 0 18px 18px;justify-content:flex-end;">
