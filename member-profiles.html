@@ -6056,6 +6056,52 @@ async function printMusicSchedule(fromDate, toDate, serviceFilter = 'all') {
     }
   });
 
+  // Collect non-Sunday special service days (same logic as renderMusicSchedule)
+  const windowStart = toISO(sundays[0]);
+  const windowEnd   = toISO(new Date(sundays[sundays.length - 1].getTime() + 6 * 24 * 60 * 60 * 1000));
+  const dayNames    = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+
+  const specialEvents = (calendarEvents || []).filter(ev =>
+    ev && ev.date && ev.title && (ev.type === 'event' || !ev.type)
+  );
+
+  specialEvents.forEach(ev => {
+    const start = new Date(ev.date + 'T00:00:00');
+    const end   = ev.endDate ? new Date(ev.endDate + 'T00:00:00') : start;
+    for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
+      if (d.getDay() === 0) continue; // Sundays already handled above
+      const iso = toISO(d);
+      if (iso < windowStart || iso > windowEnd) continue;
+      if (musicSched.find(s => s.date === iso && s.serviceType === 'dismissed_special')) continue;
+      if (serviceFilter === 'morning' || serviceFilter === 'night') continue; // filter doesn't apply to specials — always include
+      const sched = musicSched.find(s => s.date === iso && s.serviceType === 'special');
+      const dateLabel  = fmtDate(d);
+      const eventLabel = `${ev.title} — ${dayNames[d.getDay()]}`;
+      const slots = sched?.slots || [];
+      slots.forEach((slot, i) => {
+        const liveSong = songs.find(s => s.id === slot.songId);
+        const leaders  = [liveSong?.leaderName || slot.leader, liveSong?.leader2Name].filter(l => l && l !== '—').join(' & ') || '—';
+        rows.push([
+          i === 0 ? dateLabel : '',
+          i === 0 ? eventLabel : '',
+          slot.songTitle || '—',
+          leaders,
+          decodeHtml(liveSong?.key || slot.key || '—')
+        ]);
+      });
+      if (!slots.length) {
+        rows.push([dateLabel, eventLabel, '—', '—', '—']);
+      }
+    }
+  });
+
+  // Re-sort rows by date so specials appear in chronological order
+  rows.sort((a, b) => {
+    const da = a[0] || rows.slice(0, rows.indexOf(a)).reverse().find(r => r[0])?.[0] || '';
+    const db = b[0] || rows.slice(0, rows.indexOf(b)).reverse().find(r => r[0])?.[0] || '';
+    return da.localeCompare(db);
+  });
+
   doc.autoTable({
     startY: 60,
     margin: { left: 20, right: 20 },
