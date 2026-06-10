@@ -6035,7 +6035,8 @@ async function printMusicSchedule(fromDate, toDate, serviceFilter = 'all') {
     }
 
     // Night slot
-    if (serviceFilter !== 'morning') {
+    const isAfternoon = nightSched?.timeOfDay === 'afternoon';
+    if (serviceFilter !== 'morning' && !(serviceFilter === 'night' && isAfternoon)) {
       const nightSlots = nightSched?.slots || [];
       if (noServiceFlag) {
         group.rows.push([serviceFilter === 'night' ? dateLabel : '', nightLabel, 'No service scheduled', '—', '—']);
