@@ -5471,7 +5471,7 @@ async function printRehearsalItinerary() {
       const specialEvent = getEventsForDate(sunIso).find(ev => ev.type === 'event' || !ev.type);
       const mornLabel = specialEvent ? `${specialEvent.title} — Morning (${fmtDate(sun)})` : `Sunday Morning — ${fmtDate(sun)}`;
       const nightGroup = nightSched?.nightGroupOverride || getNightRotationGroupDynamic(sun);
-      const nightLabel = specialEvent ? `${specialEvent.title} — Night (${fmtDate(sun)})` : `Sunday Night — ${nightGroup} (${fmtDate(sun)})`;
+      const nightLabel = specialEvent ? `${specialEvent.title} — Night` : `Sunday Night — ${nightGroup}`;
 
       const filterByGroup = sl => {
         if (!sl.songTitle) return false;
