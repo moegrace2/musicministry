@@ -5464,7 +5464,8 @@ async function printRehearsalItinerary() {
     const schedRows = [];
     const skipServiceTable = group === 'praise';
 
-    sundaysToShow.forEach(sunIso => {
+    sundaysToShow.forEach((sunIso, sunIdx) => {
+      const rowStartIndex = schedRows.length;
       const sun = new Date(sunIso + 'T00:00:00');
       const mornSched = musicSched.find(s => s.date === sunIso && (s.serviceType === 'morning' || s.serviceType === 'special_morning'));
       const nightSched = musicSched.find(s => s.date === sunIso && (s.serviceType === 'night' || s.serviceType === 'special_night'));
@@ -5490,6 +5491,14 @@ async function printRehearsalItinerary() {
         schedRows.push([idx === 0 ? nightLabel : '', sl.songTitle, decodeHtml(sl.key || '—'), leaders]);
       });
       if (!nightSlots.length) schedRows.push([nightLabel, '(none entered)', '', '']);
+
+      // Add a bold separator line above this Sunday's first row (skip for the first Sunday)
+      if (sunIdx > 0 && schedRows[rowStartIndex]) {
+        schedRows[rowStartIndex] = schedRows[rowStartIndex].map(cell => ({
+          content: cell,
+          styles: { lineWidth: { top: 1.2 }, lineColor: [0, 0, 0] }
+        }));
+      }
     });
 
     if (!skipServiceTable) doc.autoTable({
