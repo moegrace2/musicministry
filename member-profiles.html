@@ -6078,6 +6078,7 @@ async function printMusicSchedule(fromDate, toDate, serviceFilter = 'all') {
       const iso = toISO(d);
       if (iso < windowStart || iso > windowEnd) continue;
       if (musicSched.find(s => s.date === iso && s.serviceType === 'dismissed_special')) continue;
+      if (serviceFilter === 'morning' || serviceFilter === 'night') continue;
       const sched = musicSched.find(s => s.date === iso && s.serviceType === 'special');
       const dateLabel  = fmtDate(d);
       const eventLabel = `${ev.title} — ${dayNames[d.getDay()]}`;
