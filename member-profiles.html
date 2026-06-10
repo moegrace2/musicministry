@@ -1207,10 +1207,19 @@ function closePdfModal(){
 }
 
 function printPdfModal(){
+  if (window.location.protocol === 'file:') {
+    // On file://, just re-save so the user can open and print from their PDF viewer
+    if (window._currentPdfDoc) window._currentPdfDoc.save(window._currentPdfFilename || 'document.pdf');
+    return;
+  }
   const frame = document.getElementById('pdfFrame');
-  if (frame && frame.contentWindow) {
-    frame.contentWindow.print();
-  } else if (window._currentPdfUrl) {
+  try {
+    if (frame && frame.contentWindow) {
+      frame.contentWindow.print();
+      return;
+    }
+  } catch(e) { /* cross-origin guard */ }
+  if (window._currentPdfUrl) {
     const w = window.open(window._currentPdfUrl);
     if (w) w.onload = () => w.print();
   }
@@ -1229,6 +1238,11 @@ function downloadPdfModal(){
 
 // Accepts a jsPDF instance and renders via PDF.js canvas
 function showJsPdfInModal(doc, filename, title){
+  // file:// origins can't load blob URLs into iframes — just download directly
+  if (window.location.protocol === 'file:') {
+    doc.save(filename || 'document.pdf');
+    return;
+  }
   try {
     const blob = doc.output('blob');
     const url = URL.createObjectURL(blob);
@@ -3939,11 +3953,15 @@ function getNightRotationGroup(sundayIndex) {
   return NIGHT_ROTATION[sundayIndex % 4];
 }
 
-// Get all Sundays in a 4-week window centered on current week offset
+// Get all Sundays in a 4-week window starting from the next upcoming Sunday
 function getWeekSundays(weekOffset) {
   const today = new Date();
-  const thisSunday = getSunday(today);
-  const windowStart = new Date(thisSunday);
+  today.setHours(0, 0, 0, 0);
+  // Start from the upcoming Sunday (today if today is Sunday, else next Sunday)
+  const daysUntilSunday = (7 - today.getDay()) % 7;
+  const upcomingSunday = new Date(today);
+  upcomingSunday.setDate(today.getDate() + daysUntilSunday);
+  const windowStart = new Date(upcomingSunday);
   windowStart.setDate(windowStart.getDate() + (weekOffset * 7));
   const sundays = [];
   for (let i = 0; i < 4; i++) {
@@ -5181,6 +5199,8 @@ function getNextSunday(fromDate) {
 }
 
 async function renderRehearsalTab() {
+  // Ensure music data is loaded even if Schedules page was never visited
+  if (!songs.length && !musicSched.length) await loadMusicData();
   const group = $('rehearsalGroup')?.value || 'choir';
 
   // Default rehearsal date to today if not set
@@ -5948,14 +5968,29 @@ function populateMusicLeaderDropdowns() {
 }
 
 // Print music schedule
-async function printMusicSchedule() {
+async function printMusicSchedule(fromDate, toDate) {
   const { jsPDF } = window.jspdf;
   const doc = new jsPDF({ unit: 'pt', format: 'letter' });
   const decodeHtml = s => String(s || '').replace(/♭/g, 'b').replace(/&flat;/g, 'b').replace(/&#9837;/g, 'b');
   doc.setFontSize(16);
   doc.text('Music Ministry Schedule — The Living Word', 40, 40);
 
-  const sundays = getWeekSundays(musicWeekOffset);
+  // Build Sunday list from the provided date range, or fall back to the current 4-week view
+  let sundays;
+  if (fromDate && toDate) {
+    sundays = [];
+    let cur = new Date(fromDate + 'T00:00:00');
+    const end = new Date(toDate + 'T00:00:00');
+    // Snap start to nearest Sunday (same logic as auto-assign)
+    cur.setDate(cur.getDate() - cur.getDay());
+    end.setDate(end.getDate() - end.getDay());
+    while (cur <= end) {
+      sundays.push(new Date(cur));
+      cur.setDate(cur.getDate() + 7);
+    }
+  } else {
+    sundays = getWeekSundays(musicWeekOffset);
+  }
   const rows = [];
   sundays.forEach(sunday => {
     const iso = toISO(sunday);
@@ -6120,7 +6155,15 @@ $('musicPrevWeekBtn')?.addEventListener('click', async () => { musicWeekOffset--
     importMusicData(e.target.files[0]);
     e.target.value = '';
   });
-  $('printMusicScheduleBtn')?.addEventListener('click', printMusicSchedule);
+  $('printMusicScheduleBtn')?.addEventListener('click', async () => {
+  // Pre-fill the range dialog with the currently viewed 4-week window
+  const viewedSundays = getWeekSundays(musicWeekOffset);
+  document.getElementById('printRangeFrom').value = toISO(viewedSundays[0]);
+  document.getElementById('printRangeTo').value   = toISO(viewedSundays[viewedSundays.length - 1]);
+  const range = await showPrintRangeDialog('Print Music Schedule');
+  if (range === null) return;
+  printMusicSchedule(range.from, range.to);
+});
   $('printHistoryBtn')?.addEventListener('click', printMusicHistory);
   $('historyFilterBtn')?.addEventListener('click', () => { renderSongHistory(); renderBySong(); populateMusicLeaderDropdowns(); });
   $('addChoirSongBtn')?.addEventListener('click', () => openSongModal(null, 'choir'));
