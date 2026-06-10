@@ -5996,22 +5996,24 @@ async function printMusicSchedule(fromDate, toDate, serviceFilter = 'all') {
   } else {
     sundays = getWeekSundays(musicWeekOffset);
   }
-  const rows = [];
+  const rowGroups = []; // { sortKey: 'YYYY-MM-DD', rows: [] }
+
   sundays.forEach(sunday => {
     const iso = toISO(sunday);
     const sundayIndex = getSundayIndex(sunday);
     const nightGroup = getNightRotationGroupDynamic(sunday);
-	const mornSched = musicSched.find(s => s.date === iso && (s.serviceType === 'morning' || s.serviceType === 'special_morning'));
+    const mornSched = musicSched.find(s => s.date === iso && (s.serviceType === 'morning' || s.serviceType === 'special_morning'));
     const nightSched = musicSched.find(s => s.date === iso && (s.serviceType === 'night' || s.serviceType === 'special_night'));
     const noServiceFlag = musicSched.find(s => s.date === iso && (s.serviceType === 'night' || s.serviceType === 'special_night') && s.noService);
     const morningRestored = musicSched.find(s => s.date === iso && s.serviceType === 'restored_special_morning');
-	const nightRestored = musicSched.find(s => s.date === iso && s.serviceType === 'restored_special_night');
-	const specialEvent = getEventsForDate(iso).find(ev => ev.title && (ev.type === 'event' || !ev.type));
-	const mornLabel = (specialEvent && !morningRestored) ? `${specialEvent.title} — Sunday Morning` : 'Sunday Morning';
-	const nightTimeOfDay = nightSched?.timeOfDay === 'afternoon' ? 'Sunday Afternoon' : `Sunday Night — ${nightSched?.nightGroupOverride || nightGroup}`;
-	const nightLabel = (specialEvent && !nightRestored) ? `${specialEvent.title} — ${nightTimeOfDay}` : (noServiceFlag ? 'Sunday Night' : `Sunday Night — ${nightSched?.nightGroupOverride || nightGroup}`);
-    const effectivePrintGroup = nightSched?.nightGroupOverride || nightGroup;
+    const nightRestored = musicSched.find(s => s.date === iso && s.serviceType === 'restored_special_night');
+    const specialEvent = getEventsForDate(iso).find(ev => ev.title && (ev.type === 'event' || !ev.type));
+    const mornLabel = (specialEvent && !morningRestored) ? `${specialEvent.title} — Sunday Morning` : 'Sunday Morning';
+    const nightTimeOfDay = nightSched?.timeOfDay === 'afternoon' ? 'Sunday Afternoon' : `Sunday Night — ${nightSched?.nightGroupOverride || nightGroup}`;
+    const nightLabel = (specialEvent && !nightRestored) ? `${specialEvent.title} — ${nightTimeOfDay}` : (noServiceFlag ? 'Sunday Night' : `Sunday Night — ${nightSched?.nightGroupOverride || nightGroup}`);
     const dateLabel = fmtDate(sunday);
+
+    const group = { sortKey: iso, rows: [] };
 
     // Morning slots
     if (serviceFilter !== 'night') {
@@ -6019,7 +6021,7 @@ async function printMusicSchedule(fromDate, toDate, serviceFilter = 'all') {
       mornSlots.forEach((slot, i) => {
         const liveSong = songs.find(s => s.id === slot.songId);
         const leaders = [liveSong?.leaderName || slot.leader, liveSong?.leader2Name].filter(l => l && l !== '—').join(' & ') || '—';
-        rows.push([
+        group.rows.push([
           i === 0 ? dateLabel : '',
           i === 0 ? mornLabel : '',
           slot.songTitle || '—',
@@ -6028,7 +6030,7 @@ async function printMusicSchedule(fromDate, toDate, serviceFilter = 'all') {
         ]);
       });
       if (!mornSlots.length) {
-        rows.push([dateLabel, mornLabel, '—', '—', '—']);
+        group.rows.push([dateLabel, mornLabel, '—', '—', '—']);
       }
     }
 
@@ -6036,12 +6038,12 @@ async function printMusicSchedule(fromDate, toDate, serviceFilter = 'all') {
     if (serviceFilter !== 'morning') {
       const nightSlots = nightSched?.slots || [];
       if (noServiceFlag) {
-        rows.push([serviceFilter === 'night' ? dateLabel : '', nightLabel, 'No service scheduled', '—', '—']);
+        group.rows.push([serviceFilter === 'night' ? dateLabel : '', nightLabel, 'No service scheduled', '—', '—']);
       } else {
         nightSlots.forEach((slot, i) => {
           const liveSong = songs.find(s => s.id === slot.songId);
           const leaders = [liveSong?.leaderName || slot.leader, liveSong?.leader2Name].filter(l => l && l !== '—').join(' & ') || '—';
-          rows.push([
+          group.rows.push([
             i === 0 && serviceFilter === 'night' ? dateLabel : '',
             i === 0 ? nightLabel : '',
             slot.songTitle || '—',
@@ -6050,13 +6052,15 @@ async function printMusicSchedule(fromDate, toDate, serviceFilter = 'all') {
           ]);
         });
         if (!nightSlots.length) {
-          rows.push([serviceFilter === 'night' ? dateLabel : '', nightLabel, '—', '—', '—']);
+          group.rows.push([serviceFilter === 'night' ? dateLabel : '', nightLabel, '—', '—', '—']);
         }
       }
     }
+
+    rowGroups.push(group);
   });
 
-  // Collect non-Sunday special service days (same logic as renderMusicSchedule)
+  // Collect non-Sunday special service days
   const windowStart = toISO(sundays[0]);
   const windowEnd   = toISO(new Date(sundays[sundays.length - 1].getTime() + 6 * 24 * 60 * 60 * 1000));
   const dayNames    = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
@@ -6069,19 +6073,19 @@ async function printMusicSchedule(fromDate, toDate, serviceFilter = 'all') {
     const start = new Date(ev.date + 'T00:00:00');
     const end   = ev.endDate ? new Date(ev.endDate + 'T00:00:00') : start;
     for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
-      if (d.getDay() === 0) continue; // Sundays already handled above
+      if (d.getDay() === 0) continue;
       const iso = toISO(d);
       if (iso < windowStart || iso > windowEnd) continue;
       if (musicSched.find(s => s.date === iso && s.serviceType === 'dismissed_special')) continue;
-      if (serviceFilter === 'morning' || serviceFilter === 'night') continue; // filter doesn't apply to specials — always include
       const sched = musicSched.find(s => s.date === iso && s.serviceType === 'special');
       const dateLabel  = fmtDate(d);
       const eventLabel = `${ev.title} — ${dayNames[d.getDay()]}`;
+      const group = { sortKey: iso, rows: [] };
       const slots = sched?.slots || [];
       slots.forEach((slot, i) => {
         const liveSong = songs.find(s => s.id === slot.songId);
         const leaders  = [liveSong?.leaderName || slot.leader, liveSong?.leader2Name].filter(l => l && l !== '—').join(' & ') || '—';
-        rows.push([
+        group.rows.push([
           i === 0 ? dateLabel : '',
           i === 0 ? eventLabel : '',
           slot.songTitle || '—',
@@ -6090,17 +6094,15 @@ async function printMusicSchedule(fromDate, toDate, serviceFilter = 'all') {
         ]);
       });
       if (!slots.length) {
-        rows.push([dateLabel, eventLabel, '—', '—', '—']);
+        group.rows.push([dateLabel, eventLabel, '—', '—', '—']);
       }
+      rowGroups.push(group);
     }
   });
 
-  // Re-sort rows by date so specials appear in chronological order
-  rows.sort((a, b) => {
-    const da = a[0] || rows.slice(0, rows.indexOf(a)).reverse().find(r => r[0])?.[0] || '';
-    const db = b[0] || rows.slice(0, rows.indexOf(b)).reverse().find(r => r[0])?.[0] || '';
-    return da.localeCompare(db);
-  });
+  // Sort groups by ISO date, then flatten to rows
+  rowGroups.sort((a, b) => a.sortKey.localeCompare(b.sortKey));
+  const rows = rowGroups.flatMap(g => g.rows);
 
   doc.autoTable({
     startY: 60,
