@@ -4002,7 +4002,10 @@ function getNightRotationGroupDynamic(targetSunday) {
   function isCountable(s) {
     const wasRestored = musicSched.find(r => r.date === s.date && r.serviceType === 'restored_special_night');
     const hasAnyCalendarEntry = getEventsForDate(s.date).some(ev => ev.type === 'event' || !ev.type);
-    if (hasAnyCalendarEntry && !wasRestored) return false;
+    // A night record with noService explicitly false and actual songs was deliberately
+    // restored (e.g. unchecking "No Service" on a special-event Sunday) — count it.
+    const wasDeliberatelyRestored = s.noService === false && (s.slots || []).some(sl => sl.songId);
+    if (hasAnyCalendarEntry && !wasRestored && !wasDeliberatelyRestored) return false;
     const group = s.nightGroupOverride;
     if (!group || !rotationGroups.includes(group)) return false;
     return true;
@@ -4033,7 +4036,9 @@ function getNightRotationGroupDynamic(targetSunday) {
     if (!alreadyCounted) {
       const hasAnyCalendarEntry = getEventsForDate(cursorIso).some(ev => ev.type === 'event' || !ev.type);
       const wasRestored = musicSched.find(r => r.date === cursorIso && r.serviceType === 'restored_special_night');
-      if (!hasAnyCalendarEntry || wasRestored) steps++;
+      const nightRec = musicSched.find(r => r.date === cursorIso && r.serviceType === 'night');
+      const wasDeliberatelyRestored = nightRec && nightRec.noService === false && (nightRec.slots || []).some(sl => sl.songId);
+      if (!hasAnyCalendarEntry || wasRestored || wasDeliberatelyRestored) steps++;
     }
     cursor.setDate(cursor.getDate() + 7);
   }
