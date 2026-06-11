@@ -1104,6 +1104,7 @@ function showConfirmDialog({ title = 'Confirm', message = 'Are you sure?', confi
     confirmBtn.textContent = confirmText;
 
     function finish(result) {
+      document.removeEventListener('keydown', onKeydown);
       document.body.removeChild(overlay);
       resolve(result);
     }
@@ -1112,11 +1113,18 @@ function showConfirmDialog({ title = 'Confirm', message = 'Are you sure?', confi
     cancelBtn.addEventListener('click',  () => finish(false));
     overlay.addEventListener('click', e => { if (e.target === overlay) finish(false); });
 
+    function onKeydown(e) {
+      if (e.key === 'Escape') {
+        e.stopPropagation();
+        finish(false);
+      }
+    }
+    document.addEventListener('keydown', onKeydown);
+
     overlay.appendChild(box);
     document.body.appendChild(overlay);
     confirmBtn.focus();
   });
-}
 
 /* ---------------- Notifications / Toast (inlined from notifications.js) ---------------- */
 function showToast(message, type = 'info', duration = 3500) {
@@ -3485,37 +3493,40 @@ dayNames.forEach(day => {
 }
 
 
-function showPrintRangeDialog(title, showServiceFilter = false) {
+function showPrintRangeDialog(title) {
   return new Promise(resolve => {
     document.getElementById('printRangeTitle').textContent = title;
     document.getElementById('printRangeFrom').value = '';
     document.getElementById('printRangeTo').value = '';
-    const filterWrap = document.getElementById('printServiceFilterWrap');
-    const filterSelect = document.getElementById('printServiceFilter');
-    filterWrap.style.display = showServiceFilter ? 'block' : 'none';
-    filterSelect.value = 'all';
     const modal = document.getElementById('printRangeModal');
     const confirmBtn = document.getElementById('printRangeConfirm');
     const cancelBtn = document.getElementById('printRangeCancel');
     function onConfirm() {
       cleanup();
+      modal.close();
       resolve({
         from: document.getElementById('printRangeFrom').value || null,
-        to: document.getElementById('printRangeTo').value || null,
-        serviceFilter: showServiceFilter ? filterSelect.value : 'all'
+        to: document.getElementById('printRangeTo').value || null
       });
     }
     function onCancel() {
+      cleanup();
+      modal.close();
+      resolve(null);
+    }
+    function onEscape() {
+      // Fired when the user presses Escape; the browser closes the dialog itself
       cleanup();
       resolve(null);
     }
     function cleanup() {
       confirmBtn.removeEventListener('click', onConfirm);
       cancelBtn.removeEventListener('click', onCancel);
-      modal.close();
+      modal.removeEventListener('cancel', onEscape);
     }
     confirmBtn.addEventListener('click', onConfirm);
     cancelBtn.addEventListener('click', onCancel);
+    modal.addEventListener('cancel', onEscape);
     modal.showModal();
   });
 }
@@ -4740,7 +4751,7 @@ async function saveSchedService() {
     date: lookupIso,
     serviceType,
     ...(nightGroupOverride ? { nightGroupOverride } : {}),
-    ...(noService ? { noService: true } : {}),
+    noService: !!noService,
     ...(specialTimeOfDay ? { timeOfDay: specialTimeOfDay } : {}),
     slots
   };
