@@ -3990,7 +3990,7 @@ function getWeekSundays(weekOffset) {
 }
 
 function getSundayIndex(targetSunday) {
-  const epoch = new Date('2024-01-07');
+  const epoch = new Date('2024-01-14');
   const msPerWeek = 7 * 24 * 60 * 60 * 1000;
   return Math.round((targetSunday - epoch) / msPerWeek);
 }
@@ -4002,12 +4002,12 @@ function getNightRotationGroupDynamic(targetSunday) {
   function isCountable(s) {
     const wasRestored = musicSched.find(r => r.date === s.date && r.serviceType === 'restored_special_night');
     const hasAnyCalendarEntry = getEventsForDate(s.date).some(ev => ev.type === 'event' || !ev.type);
-    // A night record with noService explicitly false and actual songs was deliberately
-    // restored (e.g. unchecking "No Service" on a special-event Sunday) — count it.
-    const wasDeliberatelyRestored = s.noService === false && (s.slots || []).some(sl => sl.songId);
-    if (hasAnyCalendarEntry && !wasRestored && !wasDeliberatelyRestored) return false;
     const group = s.nightGroupOverride;
     if (!group || !rotationGroups.includes(group)) return false;
+    // If the record has a valid group and actual songs, it was a real service — count it
+    // regardless of calendar events or the noService flag's stored value.
+    const hasSongs = (s.slots || []).some(sl => sl.songId);
+    if (hasAnyCalendarEntry && !wasRestored && !hasSongs) return false;
     return true;
   }
 
@@ -4023,7 +4023,9 @@ function getNightRotationGroupDynamic(targetSunday) {
 
   // Find how many regular Sundays exist between the last counted night and target (exclusive both ends)
   const lastNight = countedNights[countedNights.length - 1];
-  const lastIndex = NIGHT_ROTATION.indexOf(lastNight.nightGroupOverride);
+  // Use the epoch-based index of the last counted night as the anchor,
+  // so Praise Team at position 1 vs 3 is resolved correctly.
+  const lastIndex = getSundayIndex(new Date(lastNight.date + 'T00:00:00')) % NIGHT_ROTATION.length;
 
   // Count unrecorded regular Sundays between lastNight and targetSunday
   const lastDate = new Date(lastNight.date + 'T00:00:00');
@@ -4037,8 +4039,8 @@ function getNightRotationGroupDynamic(targetSunday) {
       const hasAnyCalendarEntry = getEventsForDate(cursorIso).some(ev => ev.type === 'event' || !ev.type);
       const wasRestored = musicSched.find(r => r.date === cursorIso && r.serviceType === 'restored_special_night');
       const nightRec = musicSched.find(r => r.date === cursorIso && r.serviceType === 'night');
-      const wasDeliberatelyRestored = nightRec && nightRec.noService === false && (nightRec.slots || []).some(sl => sl.songId);
-      if (!hasAnyCalendarEntry || wasRestored || wasDeliberatelyRestored) steps++;
+      const hasSongs = nightRec && (nightRec.slots || []).some(sl => sl.songId);
+      if (!hasAnyCalendarEntry || wasRestored || hasSongs) steps++;
     }
     cursor.setDate(cursor.getDate() + 7);
   }
@@ -4187,8 +4189,10 @@ function buildServiceCard(sunday, serviceType, label, sched, dayEvents, nightGro
   let slotRows = '';
   for (let i = 0; i < slotCount; i++) {
     const slot = slots[i] || {};
+    const liveSong = songs.find(s => s.id === slot.songId);
+    const leaderMember = members.find(m => m.id === liveSong?.leaderId);
     const songTitle = slot.songTitle || '—';
-    const leader = slot.leader || '—';
+    const leader = leaderMember ? memberLabel(leaderMember) : (slot.leader || '—');
     slotRows += `
       <div style="display:flex;gap:16px;align-items:center;padding:8px 0;border-bottom:1px solid var(--border)">
         <div style="width:24px;height:24px;border-radius:50%;background:var(--primary);color:#fff;display:flex;align-items:center;justify-content:center;font-size:12px;flex-shrink:0">${i+1}</div>
@@ -4538,9 +4542,11 @@ function buildSpecialServiceCard(iso, label, sched, serviceType, nightGroup) {
   for (let i = 0; i < 2; i++) {
     const slot = slots[i] || {};
     const liveSong = songs.find(s => s.id === slot.songId);
+    const leaderMember = members.find(m => m.id === liveSong?.leaderId);
+    const leader2Member = members.find(m => m.id === liveSong?.leader2Id);
     const songTitle = slot.songTitle || '—';
-    const leader = liveSong?.leaderName || slot.leader || '—';
-    const leader2 = liveSong?.leader2Name ? ` & ${liveSong.leader2Name}` : '';
+    const leader = leaderMember ? memberLabel(leaderMember) : (liveSong?.leaderName || slot.leader || '—');
+    const leader2 = leader2Member ? ` & ${memberLabel(leader2Member)}` : (liveSong?.leader2Name ? ` & ${liveSong.leader2Name}` : '');
     const key = liveSong?.key || slot.key || '';
     slotRows += `
       <div style="display:flex;gap:16px;align-items:center;padding:8px 0;border-bottom:1px solid var(--border)">
