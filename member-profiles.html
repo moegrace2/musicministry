@@ -5414,6 +5414,20 @@ async function printRehearsalItinerary() {
     ev && ev.date && ev.title && ev.type === calType
   );
 
+  // Full, un-truncated list of every rehearsal date on the calendar (any date,
+  // not just ones inside the printed range) — used to detect whether a rehearsal
+  // falls between two Sundays even if that rehearsal itself isn't being printed.
+  const allRehearsalDates = [];
+  calMatches.forEach(ev => {
+    const start = new Date(ev.date + 'T00:00:00');
+    const end = ev.endDate ? new Date(ev.endDate + 'T00:00:00') : start;
+    for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
+      const iso = toISO(d);
+      if (!allRehearsalDates.includes(iso)) allRehearsalDates.push(iso);
+    }
+  });
+  allRehearsalDates.sort();
+
   if (fromVal && toVal) {
     // Expand multi-day events and collect all matching dates in range
     calMatches.forEach(ev => {
@@ -5459,7 +5473,7 @@ async function printRehearsalItinerary() {
     doc.text(`${groupLabel} Rehearsal — ${fmtDate(new Date(rehearsalDate + 'T00:00:00'))}`, 20, yBase);
     doc.setFont(undefined, 'normal');
     doc.setFontSize(9);
-    const hasRehearsalBetweenForHeader = rehearsalDates.some(d => {
+    const hasRehearsalBetweenForHeader = allRehearsalDates.some(d => {
       const s1 = toISO(getNextSunday(rehearsalDate));
       const s2 = toISO(new Date(new Date(s1 + 'T00:00:00').setDate(new Date(s1 + 'T00:00:00').getDate() + 7)));
       return d > s1 && d < s2;
@@ -5479,7 +5493,9 @@ async function printRehearsalItinerary() {
     const nextSun2Iso = toISO(nextSun2);
 
     // Check if another rehearsal exists between nextSun1 and nextSun2 (exclusive)
-    const hasRehearsalBetween = rehearsalDates.some(d => d > nextSun1Iso && d < nextSun2Iso);
+    // Uses the full calendar list (allRehearsalDates), not just the printed batch,
+    // so a rehearsal outside the printed range still correctly limits coverage to 1 Sunday.
+    const hasRehearsalBetween = allRehearsalDates.some(d => d > nextSun1Iso && d < nextSun2Iso);
 
     const sundaysToShow = [nextSun1Iso];
     if (!hasRehearsalBetween) sundaysToShow.push(nextSun2Iso);
@@ -5668,6 +5684,7 @@ function _renderSongHistory() {
 
   // Flatten all slots from all schedule records
   const rows = [];
+  const seenRowKeys = new Set(); // guards against duplicate schedule records for the same date/service/song
   (musicSched || []).forEach(sched => {
     // Skip regular records if a special version exists for this date
     if (sched.serviceType === 'morning' && musicSched.find(s => s.date === sched.date && s.serviceType === 'special_morning')) return;
@@ -5684,6 +5701,9 @@ const liveSong = songs.find(s => s.id === slot.songId);
 	  const resolvedLeader = liveSong?.leaderName || slot.leader || '';
 	  if (leaderFilter && resolvedLeader !== leaderFilter) return;
       if (groupFilter && group !== groupFilter) return;
+      const rowKey = [sched.date, sched.serviceType, slot.songTitle, resolvedLeader].join('||');
+      if (seenRowKeys.has(rowKey)) return; // skip duplicate schedule record
+      seenRowKeys.add(rowKey);
       rows.push({ date: sched.date, serviceType: sched.serviceType, timeOfDay: sched.timeOfDay, slot, group, nightGroup: sched.nightGroupOverride || '' });
     });
   });
