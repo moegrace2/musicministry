@@ -329,6 +329,12 @@ body.maintenance .toolbar-row.edit-only{display:flex;}
 /* ── MOBILE ─────────────────────────────────────── */
 @media (max-width: 768px) {
 
+  .song-edit-btn {
+    min-height: unset;
+    padding: 6px 10px;
+    flex-shrink: 0;
+  }	
+
 /* Prevent horizontal scroll */
   html { overflow-x: hidden; }
 
@@ -5642,7 +5648,7 @@ function _renderSongLibrary() {
         </div>
       </div>
       ${statusBadge}
-      <button class="btn btn-sm">Edit</button>
+      <button class="btn btn-sm song-edit-btn">Edit</button>
     `;
     row.querySelector('button').addEventListener('click', () => openSongModal(song));
     return row;
