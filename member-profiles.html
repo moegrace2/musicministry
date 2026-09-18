@@ -769,8 +769,11 @@ body.maintenance .toolbar-row.edit-only{display:flex;}
     <div style="flex:1;min-width:280px">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
         <strong style="font-size:15px">🎵 Choir Songs</strong>
-        <button class="btn primary btn-sm" id="addChoirSongBtn">+ Add Choir Song</button>
-      </div>
+        <div style="display:flex;gap:6px">
+          <button class="btn btn-sm" id="exportChoirSongsBtn">⬇ Export List</button>
+          <button class="btn primary btn-sm" id="addChoirSongBtn">+ Add Choir Song</button>
+        </div>
+		</div>
       <div style="margin-bottom:6px;margin-top:4px"><span style="font-size:13px;font-weight:600;color:var(--muted)">🐢 Slow</span></div>
       <div id="choirSlowList" style="display:flex;flex-direction:column;gap:8px;margin-bottom:16px"></div>
       <div style="margin-bottom:6px"><span style="font-size:13px;font-weight:600;color:var(--muted)">➡ Medium</span></div>
@@ -783,8 +786,11 @@ body.maintenance .toolbar-row.edit-only{display:flex;}
     <div style="flex:1;min-width:280px">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
         <strong style="font-size:15px">🎤 Praise Team Songs</strong>
-        <button class="btn primary btn-sm" id="addPraiseSongBtn">+ Add Praise Team Song</button>
-      </div>
+        <div style="display:flex;gap:6px">
+          <button class="btn btn-sm" id="exportPraiseSongsBtn">⬇ Export List</button>
+          <button class="btn primary btn-sm" id="addPraiseSongBtn">+ Add Praise Team Song</button>
+        </div>
+		</div>
       <div style="margin-bottom:6px;margin-top:4px"><span style="font-size:13px;font-weight:600;color:var(--muted)">🐢 Slow</span></div>
       <div id="praiseSlowList" style="display:flex;flex-direction:column;gap:8px;margin-bottom:16px"></div>
       <div style="margin-bottom:6px"><span style="font-size:13px;font-weight:600;color:var(--muted)">➡ Medium</span></div>
@@ -893,6 +899,10 @@ body.maintenance .toolbar-row.edit-only{display:flex;}
     <div>
       <label>Song Title</label>
       <input type="text" id="songTitle" placeholder="Enter song title" style="display:block;margin-top:4px;width:100%"/>
+    </div>
+    <div>
+      <label>Original Artist <span style="font-weight:400;color:var(--muted);font-size:12px">(optional)</span></label>
+      <input type="text" id="songArtist" placeholder="Enter original artist" style="display:block;margin-top:4px;width:100%"/>
     </div>
     <div>
       <label>Key <span style="font-weight:400;color:var(--muted);font-size:12px">(optional)</span></label>
@@ -5667,6 +5677,53 @@ function _renderSongLibrary() {
   renderTempoSections('praise', 'praise');
 }
 
+/********** Song List Export (per group) **********/
+function pdfSafeKey(str) {
+  return String(str || '').replace(/♭/g, 'b').replace(/♯/g, '#');
+}
+
+function exportSongListPdf(type) {
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({ unit: 'pt', format: 'letter' });
+  const label = type === 'praise' ? 'Praise Team' : 'Choir';
+  const tempoOrder = { slow: 0, medium: 1, fast: 2, '': 3 };
+
+  const list = (songs || [])
+    .filter(s => (s.type || 'choir') === type && s.status !== 'retired')
+    .slice()
+    .sort((a, b) =>
+      (tempoOrder[a.tempo || ''] - tempoOrder[b.tempo || '']) ||
+      String(a.title).localeCompare(String(b.title))
+    );
+
+  if (!list.length) { alert(`No ${label} songs found to export.`); return; }
+
+  doc.setFontSize(16);
+  doc.text(`${label} Song List — The Living Word`, 40, 40);
+
+    const rows = list.map(s => [
+    s.title || '',
+    s.originalArtist || '—',
+    s.key ? pdfSafeKey(`${s.key}${s.modulations && s.modulations.length ? ' > ' + s.modulations.join(' > ') : ''}`) : '—',
+    s.tempo ? s.tempo.charAt(0).toUpperCase() + s.tempo.slice(1) : '—',
+    [s.leaderName, s.leader2Name].filter(Boolean).join(' & ') || '—'
+  ]);
+
+  doc.autoTable({
+    startY: 60,
+    head: [['Song', 'Artist', 'Key', 'Tempo', 'Lead Singer']],
+    body: rows,
+    styles: { fontSize: 10, cellPadding: 6, overflow: 'linebreak' },
+    headStyles: { fillColor: [31, 74, 168] },
+    columnStyles: { 0: { cellWidth: 'auto' }, 1: { cellWidth: 90 }, 2: { cellWidth: 70 }, 3: { cellWidth: 150 } }
+  });
+
+  showJsPdfInModal(doc, `${type}-song-list.pdf`, `${label} Song List`);
+}
+
+$('exportChoirSongsBtn').addEventListener('click', async () => { await loadMusicData(); exportSongListPdf('choir'); });
+$('exportPraiseSongsBtn').addEventListener('click', async () => { await loadMusicData(); exportSongListPdf('praise'); });
+
 async function renderSongHistory() {
   await loadMusicData();
   await loadCalendarEvents();
@@ -5897,6 +5954,7 @@ function openSongModal(song, type) {
   $('songId').value = song ? song.id : '';
   $('songType').value = songType;
   $('songTitle').value = song ? song.title : '';
+  $('songArtist').value = song ? (song.originalArtist || '') : '';
   $('songKey').value = song ? (song.key || '') : '';
 
   // --- Modulations ---
@@ -5964,6 +6022,7 @@ async function saveSong() {
   const rec = {
     id: $('songId').value || nextSongId(),
     title,
+    originalArtist: $('songArtist').value.trim(),
     key: $('songKey').value || '',
     modulations,
     leaderId,
