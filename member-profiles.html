@@ -920,6 +920,16 @@ body.maintenance .toolbar-row.edit-only{display:flex;}
       <input type="text" id="songTitle" placeholder="Enter song title" style="display:block;margin-top:4px;width:100%"/>
     </div>
     <div>
+      <label style="display:flex;align-items:center;gap:8px;cursor:pointer">
+        <input type="checkbox" id="songIsMedley"/> This is a medley
+      </label>
+    </div>
+    <div id="songPartsWrapOuter" style="display:none">
+      <label>Medley Parts <span style="font-weight:400;color:var(--muted);font-size:12px">(in the order sung)</span></label>
+      <div id="songPartsWrap" style="display:flex;flex-direction:column;gap:10px;margin-top:4px"></div>
+      <button type="button" class="btn btn-sm" id="addPartBtn" style="margin-top:6px">+ Add Part</button>
+    </div>
+    <div id="songArtistWrap">
       <label>Original Artist <span style="font-weight:400;color:var(--muted);font-size:12px">(optional)</span></label>
       <input type="text" id="songArtist" placeholder="Enter original artist" style="display:block;margin-top:4px;width:100%"/>
     </div>
@@ -5653,9 +5663,11 @@ function _renderSongLibrary() {
       : song.status === 'night'
       ? `<span style="font-size:11px;padding:3px 10px;border-radius:999px;background:#eef2ff;color:#3730a3;white-space:nowrap">Night only</span>`
       : '';
+    const hasParts = song.parts && song.parts.length;
     row.innerHTML = `
       <div style="flex:1">
-        <div style="font-weight:600">${song.title}</div>
+        <div style="font-weight:600">${song.title}${hasParts ? ' <span style="font-size:11px;padding:2px 8px;border-radius:999px;background:#ecfdf5;color:#047857;vertical-align:middle">Medley</span>' : ''}</div>
+        ${hasParts ? `<div style="font-size:12px;color:var(--muted);margin-top:2px">${song.parts.map((p, i) => `${i + 1}) ${p.title}${p.artist ? ` (${p.artist})` : ''}${p.sung ? ` - ${p.sung}` : ''}`).join('<br>')}</div>` : ''}
         <div style="font-size:12px;color:var(--muted);margin-top:2px">
           ${song.key ? `Key: ${song.key}${song.modulations && song.modulations.length ? ' → ' + song.modulations.join(' → ') : ''} · ` : ''}Led by: ${song.leaderName || '—'}${song.leader2Name ? ` & ${song.leader2Name}` : ''} · Used ${timesUsed}× ${lastUsed ? `· Last: ${fmtLongDate(lastUsed)}` : ''}
         </div>
@@ -5719,7 +5731,9 @@ function exportSongListPdf(type) {
   doc.text(`${label} Song List — The Living Word`, 40, 40);
 
     const rows = list.map(s => [
-    s.title || '',
+    (s.title || '') + (s.parts && s.parts.length
+      ? '\n' + s.parts.map((p, i) => `${i + 1}) ${p.title}${p.artist ? ` (${p.artist})` : ''}${p.sung ? ` - ${p.sung}` : ''}`).join('\n')
+      : ''),
     s.originalArtist || '—',
     s.key ? pdfSafeKey(`${s.key}${s.modulations && s.modulations.length ? ' > ' + s.modulations.join(' > ') : ''}`) : '—',
     s.tempo ? s.tempo.charAt(0).toUpperCase() + s.tempo.slice(1) : '—',
@@ -6034,6 +6048,38 @@ function openSongModal(song, type) {
     if (song && song[field] === 'N/A') sel.value = 'N/A';  // ← ADD THIS
   });
 
+  // --- Medley parts ---
+  const partsWrap = $('songPartsWrap');
+  partsWrap.innerHTML = '';
+  function addPartRow(p) {
+    p = p || {};
+    const box = document.createElement('div');
+    box.className = 'medley-part';
+    box.style.cssText = 'display:flex;flex-direction:column;gap:6px;padding:10px;border:1px solid var(--border);border-radius:10px';
+    box.innerHTML = `
+      <input type="text" class="partTitle" placeholder="Song title" style="width:100%"/>
+      <input type="text" class="partArtist" placeholder="Original artist" style="width:100%"/>
+      <input type="text" class="partSung" placeholder="What's sung (e.g. Chorus, Verse 1 &amp; Chorus)" style="width:100%"/>
+      <button type="button" class="btn btn-sm danger" style="align-self:flex-end">Remove</button>`;
+    box.querySelector('.partTitle').value = p.title || '';
+    box.querySelector('.partArtist').value = p.artist || '';
+    box.querySelector('.partSung').value = p.sung || '';
+    box.querySelector('button').onclick = () => box.remove();
+    partsWrap.appendChild(box);
+  }
+  const existingParts = (song && song.parts) ? song.parts : [];
+  existingParts.forEach(addPartRow);
+  $('songIsMedley').checked = existingParts.length > 0;
+  function syncMedleyUI() {
+    const on = $('songIsMedley').checked;
+    $('songPartsWrapOuter').style.display = on ? '' : 'none';
+    $('songArtistWrap').style.display = on ? 'none' : '';
+    if (on && !partsWrap.children.length) { addPartRow(); addPartRow(); }
+  }
+  $('songIsMedley').onchange = syncMedleyUI;
+  $('addPartBtn').onclick = () => addPartRow();
+  syncMedleyUI();
+
   $('songModal').showModal();
 }
 
@@ -6047,10 +6093,21 @@ async function saveSong() {
   const modulations = [...$('songModulationsWrap').querySelectorAll('select')]
     .map(s => s.value).filter(Boolean);
 
+  const isMedley = $('songIsMedley').checked;
+  const parts = isMedley
+    ? [...$('songPartsWrap').querySelectorAll('.medley-part')].map(b => ({
+        title: b.querySelector('.partTitle').value.trim(),
+        artist: b.querySelector('.partArtist').value.trim(),
+        sung: b.querySelector('.partSung').value.trim()
+      })).filter(p => p.title)
+    : [];
+  if (isMedley && parts.length < 2) return alert('A medley needs at least 2 parts with a song title.');
+  const medleyArtist = [...new Set(parts.map(p => p.artist).filter(Boolean))].join(' / ');
+
   const rec = {
     id: $('songId').value || nextSongId(),
     title,
-    originalArtist: $('songArtist').value.trim(),
+    originalArtist: isMedley ? medleyArtist : $('songArtist').value.trim(),
     key: $('songKey').value || '',
     modulations,
     leaderId,
@@ -6059,7 +6116,8 @@ async function saveSong() {
     leader2Name: leader2Id === 'N/A' ? 'N/A' : (leader2Member ? memberLabel(leader2Member) : ''),
     type: $('songType').value || 'choir',
     tempo: $('songTempo').value || '',
-    status: $('songStatus').value || 'active'
+    status: $('songStatus').value || 'active',
+    parts
   };
   await idbPut('songs', rec);
   songs = await idbGetAll('songs');
