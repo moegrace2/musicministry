@@ -326,6 +326,8 @@ body.maintenance .toolbar-row.edit-only{display:flex;}
 .pdf-modal-body{padding:0; flex:1 1 auto; min-height:0;}
 .pdf-modal-body iframe{width:100%; height:100%; border:0; display:block;}
 
+#songTypeTabs { display: none; }
+
 /* ── MOBILE ─────────────────────────────────────── */
 @media (max-width: 768px) {
 
@@ -334,6 +336,13 @@ body.maintenance .toolbar-row.edit-only{display:flex;}
     padding: 6px 10px;
     flex-shrink: 0;
   }	
+  
+    /* Song Library: choir / praise team tabs */
+  #songTypeTabs { display: flex; margin-bottom: 12px; }
+  #songTypeTabs .btn { flex: 1; }
+  #songLibraryView[data-tab="choir"] #songColPraise,
+  #songLibraryView[data-tab="praise"] #songColChoir,
+  #songColDivider { display: none; }
 
 /* Prevent horizontal scroll */
   html { overflow-x: hidden; }
@@ -771,8 +780,12 @@ body.maintenance .toolbar-row.edit-only{display:flex;}
       <input type="text" id="songSearch" placeholder="Search by title or leader…" style="display:block;margin-top:4px;width:100%"/>
     </div>
   </div>
+  <div id="songTypeTabs">
+    <button class="btn segment primary" id="songTabChoir" data-tab="choir">🎵 Choir</button>
+    <button class="btn segment" id="songTabPraise" data-tab="praise">🎤 Praise Team</button>
+  </div>
   <div style="display:flex;gap:24px;align-items:flex-start;flex-wrap:wrap">
-    <div style="flex:1;min-width:280px">
+    <div id="songColChoir" style="flex:1;min-width:280px">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
         <strong style="font-size:15px">🎵 Choir Songs</strong>
         <div style="display:flex;gap:6px">
@@ -788,8 +801,8 @@ body.maintenance .toolbar-row.edit-only{display:flex;}
       <div id="choirFastList" style="display:flex;flex-direction:column;gap:8px;margin-bottom:6px"></div>
       <div id="choirNoTempoList" style="display:flex;flex-direction:column;gap:8px"></div>
     </div>
-    <div style="width:1px;background:var(--border);align-self:stretch;min-height:100px"></div>
-    <div style="flex:1;min-width:280px">
+    <div id="songColDivider" style="width:1px;background:var(--border);align-self:stretch;min-height:100px"></div>
+    <div id="songColPraise" style="flex:1;min-width:280px">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
         <strong style="font-size:15px">🎤 Praise Team Songs</strong>
         <div style="display:flex;gap:6px">
@@ -5660,6 +5673,9 @@ function _renderSongLibrary() {
       (!query || s.title.toLowerCase().includes(query) || (s.leaderName || '').toLowerCase().includes(query))
     ).slice().sort((a, b) => a.title.localeCompare(b.title));
 
+    const tabBtn = $(type === 'praise' ? 'songTabPraise' : 'songTabChoir');
+    if (tabBtn) tabBtn.textContent = `${type === 'praise' ? '🎤 Praise Team' : '🎵 Choir'} (${filtered.length})`;
+
     const buckets = { slow: [], medium: [], fast: [], '': [] };
     filtered.forEach(s => {
       const t = s.tempo || '';
@@ -5692,15 +5708,10 @@ function exportSongListPdf(type) {
   const { jsPDF } = window.jspdf;
   const doc = new jsPDF({ unit: 'pt', format: 'letter' });
   const label = type === 'praise' ? 'Praise Team' : 'Choir';
-  const tempoOrder = { slow: 0, medium: 1, fast: 2, '': 3 };
-
   const list = (songs || [])
     .filter(s => (s.type || 'choir') === type && s.status !== 'retired')
     .slice()
-    .sort((a, b) =>
-      (tempoOrder[a.tempo || ''] - tempoOrder[b.tempo || '']) ||
-      String(a.title).localeCompare(String(b.title))
-    );
+    .sort((a, b) => String(a.title).localeCompare(String(b.title)));
 
   if (!list.length) { alert(`No ${label} songs found to export.`); return; }
 
@@ -5729,6 +5740,17 @@ function exportSongListPdf(type) {
 
 $('exportChoirSongsBtn').addEventListener('click', async () => { await loadMusicData(); exportSongListPdf('choir'); });
 $('exportPraiseSongsBtn').addEventListener('click', async () => { await loadMusicData(); exportSongListPdf('praise'); });
+
+function setSongLibTab(which) {
+  const sec = $('songLibraryView');
+  if (!sec) return;
+  sec.dataset.tab = which;
+  document.querySelectorAll('#songTypeTabs button').forEach(b =>
+    b.classList.toggle('primary', b.dataset.tab === which));
+}
+document.querySelectorAll('#songTypeTabs button').forEach(b =>
+  b.addEventListener('click', () => setSongLibTab(b.dataset.tab)));
+setSongLibTab('choir');
 
 async function renderSongHistory() {
   await loadMusicData();
