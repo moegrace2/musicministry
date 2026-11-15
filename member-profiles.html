@@ -6387,6 +6387,7 @@ $('musicPrevWeekBtn')?.addEventListener('click', async () => { musicWeekOffset--
     btn.textContent = isHidden ? '▼ Hide Hidden Services' : '▶ Show Hidden Services';
   });
   $('musicNextWeekBtn')?.addEventListener('click', async () => { musicWeekOffset++; await loadMusicData(); renderMusicSchedule(); });
+  $('exportMusicBtn')?.addEventListener('click', exportMusicData);
   $('importMusicInput')?.addEventListener('change', e => {
     importMusicData(e.target.files[0]);
     e.target.value = '';
