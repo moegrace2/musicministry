@@ -328,6 +328,8 @@ body.maintenance .toolbar-row.edit-only{display:flex;}
 
 #songTypeTabs { display: none; }
 
+#songTypeTabs .btn.segment:not(:first-child):not(:last-child) { border-radius: 0; }
+
 /* ── MOBILE ─────────────────────────────────────── */
 @media (max-width: 768px) {
 
@@ -341,8 +343,12 @@ body.maintenance .toolbar-row.edit-only{display:flex;}
   #songTypeTabs { display: flex; margin-bottom: 12px; }
   #songTypeTabs .btn { flex: 1; }
   #songLibraryView[data-tab="choir"] #songColPraise,
+  #songLibraryView[data-tab="choir"] #songColCong,
   #songLibraryView[data-tab="praise"] #songColChoir,
-  #songColDivider { display: none; }
+  #songLibraryView[data-tab="praise"] #songColCong,
+  #songLibraryView[data-tab="congregational"] #songColChoir,
+  #songLibraryView[data-tab="congregational"] #songColPraise,
+  #songColDivider, #songColDivider2 { display: none; }
 
 /* Prevent horizontal scroll */
   html { overflow-x: hidden; }
@@ -782,7 +788,8 @@ body.maintenance .toolbar-row.edit-only{display:flex;}
   </div>
   <div id="songTypeTabs">
     <button class="btn segment primary" id="songTabChoir" data-tab="choir">🎵 Choir</button>
-    <button class="btn segment" id="songTabPraise" data-tab="praise">🎤 Praise Team</button>
+    <button class="btn segment" id="songTabPraise" data-tab="praise">🎤 Praise</button>
+    <button class="btn segment" id="songTabCong" data-tab="congregational">🙌 Congregational</button>
   </div>
   <div style="display:flex;gap:24px;align-items:flex-start;flex-wrap:wrap">
     <div id="songColChoir" style="flex:1;min-width:280px">
@@ -817,6 +824,23 @@ body.maintenance .toolbar-row.edit-only{display:flex;}
       <div style="margin-bottom:6px"><span style="font-size:13px;font-weight:600;color:var(--muted)">⚡ Fast</span></div>
       <div id="praiseFastList" style="display:flex;flex-direction:column;gap:8px;margin-bottom:6px"></div>
       <div id="praiseNoTempoList" style="display:flex;flex-direction:column;gap:8px"></div>
+    </div>
+    <div id="songColDivider2" style="width:1px;background:var(--border);align-self:stretch;min-height:100px"></div>
+    <div id="songColCong" style="flex:1;min-width:280px">
+      <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:8px">
+        <strong style="font-size:15px">🙌 Congregational / Testimony</strong>
+        <div style="display:flex;gap:6px">
+          <button class="btn btn-sm" id="exportCongSongsBtn">⬇ Export List</button>
+          <button class="btn primary btn-sm" id="addCongSongBtn">+ Add Song</button>
+        </div>
+      </div>
+      <div style="margin-bottom:6px;margin-top:4px"><span style="font-size:13px;font-weight:600;color:var(--muted)">🐢 Slow</span></div>
+      <div id="congSlowList" style="display:flex;flex-direction:column;gap:8px;margin-bottom:16px"></div>
+      <div style="margin-bottom:6px"><span style="font-size:13px;font-weight:600;color:var(--muted)">➡ Medium</span></div>
+      <div id="congMediumList" style="display:flex;flex-direction:column;gap:8px;margin-bottom:16px"></div>
+      <div style="margin-bottom:6px"><span style="font-size:13px;font-weight:600;color:var(--muted)">⚡ Fast</span></div>
+      <div id="congFastList" style="display:flex;flex-direction:column;gap:8px;margin-bottom:6px"></div>
+      <div id="congNoTempoList" style="display:flex;flex-direction:column;gap:8px"></div>
     </div>
   </div>
 </section>
@@ -4486,7 +4510,7 @@ function openSpecialSchedModal(iso, label, serviceType, nightGroup) {
         <label>Song</label>
         <select class="slotSongSelect" data-slot="${i}" style="display:block;margin-top:4px;width:100%">
           <option value="">— Select a song —</option>
-          ${songs.slice().sort((a, b) => a.title.localeCompare(b.title)).map(s => `<option value="${s.id}" ${s.id === slot.songId ? 'selected' : ''}>${s.title}${s.key ? ` (${decodeKey(s.key)})` : ''}</option>`).join('')}
+          ${songs.filter(s => s.type !== 'congregational').slice().sort((a, b) => a.title.localeCompare(b.title)).map(s => `<option value="${s.id}" ${s.id === slot.songId ? 'selected' : ''}>${s.title}${s.key ? ` (${decodeKey(s.key)})` : ''}</option>`).join('')}
         </select>
       </div>
       <div style="display:flex;gap:10px">
@@ -5663,6 +5687,7 @@ function _renderSongLibrary() {
       ${statusBadge}
       <button class="btn btn-sm song-edit-btn">Edit</button>
     `;
+    if (song.type === 'congregational') row.querySelector('div[style*="font-size:12px"]')?.remove();
     row.querySelector('button').addEventListener('click', () => openSongModal(song));
     return row;
   }
@@ -5673,8 +5698,9 @@ function _renderSongLibrary() {
       (!query || s.title.toLowerCase().includes(query) || (s.leaderName || '').toLowerCase().includes(query))
     ).slice().sort((a, b) => a.title.localeCompare(b.title));
 
-    const tabBtn = $(type === 'praise' ? 'songTabPraise' : 'songTabChoir');
-    if (tabBtn) tabBtn.textContent = `${type === 'praise' ? '🎤 Praise Team' : '🎵 Choir'} (${filtered.length})`;
+    const tabInfo = { choir: ['songTabChoir', '🎵 Choir'], praise: ['songTabPraise', '🎤 Praise'], congregational: ['songTabCong', '🙌 Congregational'] }[type];
+    const tabBtn = tabInfo && $(tabInfo[0]);
+    if (tabBtn) tabBtn.textContent = `${tabInfo[1]} (${filtered.length})`;
 
     const buckets = { slow: [], medium: [], fast: [], '': [] };
     filtered.forEach(s => {
@@ -5697,6 +5723,7 @@ function _renderSongLibrary() {
 
   renderTempoSections('choir', 'choir');
   renderTempoSections('praise', 'praise');
+  renderTempoSections('congregational', 'cong');
 }
 
 /********** Song List Export (per group) **********/
@@ -5707,7 +5734,7 @@ function pdfSafeKey(str) {
 function exportSongListPdf(type) {
   const { jsPDF } = window.jspdf;
   const doc = new jsPDF({ unit: 'pt', format: 'letter' });
-  const label = type === 'praise' ? 'Praise Team' : 'Choir';
+  const label = type === 'praise' ? 'Praise Team' : type === 'congregational' ? 'Congregational' : 'Choir';
   const list = (songs || [])
     .filter(s => (s.type || 'choir') === type && s.status !== 'retired')
     .slice()
@@ -5718,21 +5745,27 @@ function exportSongListPdf(type) {
   doc.setFontSize(16);
   doc.text(`${label} Song List — The Living Word`, 40, 40);
 
-    const rows = list.map(s => [
-    s.title || '',
-    s.originalArtist || '—',
-    s.key ? pdfSafeKey(`${s.key}${s.modulations && s.modulations.length ? ' > ' + s.modulations.join(' > ') : ''}`) : '—',
-    s.tempo ? s.tempo.charAt(0).toUpperCase() + s.tempo.slice(1) : '—',
-    [s.leaderName, s.leader2Name].filter(Boolean).join(' & ') || '—'
-  ]);
+  const simple = type === 'congregational';
+  const tempoLabel = s => s.tempo ? s.tempo.charAt(0).toUpperCase() + s.tempo.slice(1) : '—';
+  const rows = list.map(s => simple
+    ? [s.title || '', tempoLabel(s)]
+    : [
+        s.title || '',
+        s.originalArtist || '—',
+        s.key ? pdfSafeKey(`${s.key}${s.modulations && s.modulations.length ? ' > ' + s.modulations.join(' > ') : ''}`) : '—',
+        tempoLabel(s),
+        [s.leaderName, s.leader2Name].filter(Boolean).join(' & ') || '—'
+      ]);
 
   doc.autoTable({
     startY: 60,
-    head: [['Song', 'Original Artist', 'Key', 'Tempo', 'Lead Singer']],
+    head: [simple ? ['Song', 'Tempo'] : ['Song', 'Original Artist', 'Key', 'Tempo', 'Lead Singer']],
     body: rows,
     styles: { fontSize: 10, cellPadding: 6, overflow: 'linebreak' },
     headStyles: { fillColor: [31, 74, 168] },
-    columnStyles: { 0: { cellWidth: 'auto' }, 1: { cellWidth: 90 }, 2: { cellWidth: 70 }, 3: { cellWidth: 150 } }
+    columnStyles: simple
+      ? { 0: { cellWidth: 'auto' }, 1: { cellWidth: 100 } }
+      : { 0: { cellWidth: 'auto' }, 1: { cellWidth: 90 }, 2: { cellWidth: 70 }, 3: { cellWidth: 150 } }
   });
 
   showJsPdfInModal(doc, `${type}-song-list.pdf`, `${label} Song List`);
@@ -5740,6 +5773,7 @@ function exportSongListPdf(type) {
 
 $('exportChoirSongsBtn').addEventListener('click', async () => { await loadMusicData(); exportSongListPdf('choir'); });
 $('exportPraiseSongsBtn').addEventListener('click', async () => { await loadMusicData(); exportSongListPdf('praise'); });
+$('exportCongSongsBtn').addEventListener('click', async () => { await loadMusicData(); exportSongListPdf('congregational'); });
 
 function setSongLibTab(which) {
   const sec = $('songLibraryView');
@@ -5978,7 +6012,11 @@ async function addToSection(sectionKey) {
 
 function openSongModal(song, type) {
   const songType = song ? song.type : (type || 'choir');
-  $('songModalTitle').textContent = (song ? 'Edit' : 'Add') + (songType === 'praise' ? ' Praise Team' : ' Choir') + ' Song';
+  $('songModalTitle').textContent = (song ? 'Edit' : 'Add') + (songType === 'praise' ? ' Praise Team' : songType === 'congregational' ? ' Congregational' : ' Choir') + ' Song';
+  // Congregational songs only need a title and tempo
+  ['songArtist', 'songKey', 'songModulationsWrap', 'songStatus', 'songLeader', 'songLeader2'].forEach(id => {
+    $(id).parentElement.style.display = songType === 'congregational' ? 'none' : '';
+  });
   $('songId').value = song ? song.id : '';
   $('songType').value = songType;
   $('songTitle').value = song ? song.title : '';
@@ -6366,6 +6404,7 @@ $('musicPrevWeekBtn')?.addEventListener('click', async () => { musicWeekOffset--
   $('historyFilterBtn')?.addEventListener('click', () => { renderSongHistory(); renderBySong(); populateMusicLeaderDropdowns(); });
   $('addChoirSongBtn')?.addEventListener('click', () => openSongModal(null, 'choir'));
   $('addPraiseSongBtn')?.addEventListener('click', () => openSongModal(null, 'praise'));
+  $('addCongSongBtn')?.addEventListener('click', () => openSongModal(null, 'congregational'));
   $('section1AddBtn')?.addEventListener('click', () => addToSection('section1'));
   $('section2AddBtn')?.addEventListener('click', () => addToSection('section2'));
   $('songSaveBtn')?.addEventListener('click', saveSong);
