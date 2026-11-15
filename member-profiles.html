@@ -5731,9 +5731,73 @@ function pdfSafeKey(str) {
   return String(str || '').replace(/♭/g, 'b').replace(/♯/g, '#');
 }
 
+function drawCongregationalColumns(doc, list) {
+  const pageW = doc.internal.pageSize.getWidth();
+  const pageH = doc.internal.pageSize.getHeight();
+  const M = 40, gap = 20, cols = 3;
+  const fontSize = 8, lead = 9.5, pad = 2.5;
+  const colW = (pageW - 2 * M - gap * (cols - 1)) / cols;
+  const top = 60, bottom = pageH - M;
+  const names = { slow: 'Slow', medium: 'Medium', fast: 'Fast' };
+
+  // Flat list: a heading item whenever the tempo changes, then the songs (already sorted)
+  const items = [];
+  let lastTempo = null;
+  list.forEach(s => {
+    const t = names[s.tempo] ? s.tempo : '';
+    if (t !== lastTempo) { items.push({ heading: names[t] || 'No Tempo' }); lastTempo = t; }
+    items.push({ song: s.title || '' });
+  });
+
+  const measure = it => {
+    doc.setFont('helvetica', it.heading ? 'bold' : 'normal');
+    doc.setFontSize(fontSize);
+    const lines = doc.splitTextToSize(it.heading || it.song, colW - 2 * pad);
+    return { lines, h: lines.length * lead + 2 * pad };
+  };
+
+  let col = 0, y = top;
+  const nextColumn = () => {
+    col++;
+    if (col >= cols) {            // out of columns: start a new page
+      doc.addPage();
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(16);
+      doc.text('Congregational Song List — The Living Word', M, 40);
+      col = 0;
+    }
+    y = top;
+  };
+
+  items.forEach((it, i) => {
+    const m = measure(it);
+    let need = m.h;
+    if (it.heading) {             // keep a heading together with its next 3 songs
+      for (let j = i + 1; j <= i + 3 && j < items.length; j++) need += measure(items[j]).h;
+    }
+    if (y + need > bottom) nextColumn();
+
+    const x = M + col * (colW + gap);
+    if (it.heading) {
+      doc.setFillColor(226, 232, 240);
+      doc.rect(x, y, colW, m.h, 'F');
+    }
+    doc.setFont('helvetica', it.heading ? 'bold' : 'normal');
+    doc.setFontSize(fontSize);
+    doc.setTextColor(0);
+    m.lines.forEach((ln, k) => doc.text(ln, x + pad, y + pad + fontSize - 1 + k * lead));
+    if (!it.heading) {
+      doc.setDrawColor(225, 230, 237);
+      doc.setLineWidth(0.5);
+      doc.line(x, y + m.h, x + colW, y + m.h);
+    }
+    y += m.h;
+  });
+}
+
 function exportSongListPdf(type) {
   const { jsPDF } = window.jspdf;
-  const doc = new jsPDF({ unit: 'pt', format: 'letter' });
+  const doc = new jsPDF({ unit: 'pt', format: 'letter', orientation: type === 'congregational' ? 'landscape' : 'portrait' });
   const label = type === 'praise' ? 'Praise Team' : type === 'congregational' ? 'Congregational' : 'Choir';
   const list = (songs || [])
     .filter(s => (s.type || 'choir') === type && s.status !== 'retired')
@@ -5750,6 +5814,12 @@ function exportSongListPdf(type) {
 
   doc.setFontSize(16);
   doc.text(`${label} Song List — The Living Word`, 40, 40);
+
+  if (type === 'congregational') {
+    drawCongregationalColumns(doc, list);
+    showJsPdfInModal(doc, `${type}-song-list.pdf`, `${label} Song List`);
+    return;
+  }
 
   const simple = type === 'congregational';
   const tempoLabel = s => s.tempo ? s.tempo.charAt(0).toUpperCase() + s.tempo.slice(1) : '—';
