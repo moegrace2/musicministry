@@ -5017,6 +5017,41 @@ async function runAutoAssign(save) {
     }
   });
 
+  // --- Rolling 8-week song history + singer history, built from everything on the schedule ---
+  // (slots in the range are left out in Overwrite mode, since they're about to be replaced)
+  const usedDates = {};      // songId -> every date it is (or will be) on the schedule
+  const singersByDate = {};  // date -> singers on the schedule that Sunday
+  const addUsed = (id, date) => { (usedDates[id] = usedDates[id] || []).push(date); };
+  const addSingers = (date, names) => {
+    const set = singersByDate[date] = singersByDate[date] || new Set();
+    names.filter(Boolean).forEach(n => set.add(n));
+  };
+  musicSched.forEach(s => {
+    if (mode === 'overwrite' && sundays.includes(s.date)) return;
+    (s.slots || []).forEach(sl => {
+      if (sl.songId && sl.songTitle) {
+        addUsed(sl.songId, s.date);
+        addSingers(s.date, [sl.leader, sl.leader2]);
+      }
+    });
+  });
+  const shiftDay = (iso, n) => { const d = new Date(iso + 'T00:00:00'); d.setDate(d.getDate() + n); return toISO(d); };
+  // A song used less than 8 weeks before OR after this Sunday counts as "recent"
+  const recentFor = iso => {
+    const out = {};
+    Object.keys(usedDates).forEach(id => {
+      const hit = usedDates[id].some(d => Math.abs(Math.round((new Date(d + 'T00:00:00') - new Date(iso + 'T00:00:00')) / 86400000)) < 56);
+      if (hit) out[id] = iso;
+    });
+    return out;
+  };
+  // Singers on the Sunday before or after this one are reported to the pickers as "sang last Sunday"
+  const blockedFor = iso => {
+    const prev = shiftDay(iso, -7), next = shiftDay(iso, 7), out = {};
+    [prev, next].forEach(d => (singersByDate[d] || new Set()).forEach(n => { out[n] = prev; }));
+    return out;
+  };
+
   _autoAssignPending = [];
   _conflictResolutions = {};
   const warnings = [];
@@ -5057,7 +5092,7 @@ async function runAutoAssign(save) {
         .filter(s => (s.type || 'choir') === 'choir' && s.status !== 'retired' && s.status !== 'night')
         .filter(s => ![s.leaderName, s.leader2Name].filter(Boolean).some(l => keptMornLeaders.has(l)))
         .filter(s => !keptMornTempos.some(t => (t === 'fast' || t === 'slow') && t === (s.tempo || '').toLowerCase()));
-      const result = pickMorningSongs(choirSongs, iso, prevIso, leaderLastSung, recentlyUsed, lookbackIso, warnings, iso);
+      const result = pickMorningSongs(choirSongs, iso, shiftDay(iso, -7), blockedFor(iso), recentFor(iso), lookbackIso, warnings, iso);
       const newSlots = existingMorn ? [...(existingMorn.slots || [])] : [];
       result.forEach((picked, idx) => {
         const slotIdx = fillMorn[idx];
@@ -5072,8 +5107,8 @@ async function runAutoAssign(save) {
         };
         [picked.leaderName, picked.leader2Name].filter(Boolean).forEach(l => mornLeadersToday.add(l));
         // Update tracking for subsequent Sundays
-        recentlyUsed[picked.id] = iso;
-        [picked.leaderName, picked.leader2Name].filter(Boolean).forEach(l => { leaderLastSung[l] = iso; });
+        addUsed(picked.id, iso);
+        addSingers(iso, [picked.leaderName, picked.leader2Name]);
       });
       _autoAssignPending.push({
         date: iso,
@@ -5093,7 +5128,7 @@ async function runAutoAssign(save) {
     if (fillNight) {
       const isPraise = nightGroup === 'Praise Team';
       const nightSongs = songs.filter(s => isPraise ? (s.type === 'praise' && s.status !== 'retired') : ((s.type || 'choir') === 'choir' && s.status !== 'retired'));
-      const picked = pickNightSong(nightSongs, iso, prevIso, leaderLastSung, recentlyUsed, lookbackIso, mornLeadersToday, isPraise, nightGroup, praiseLeaderLastNight, sectionLastLeader, warnings);
+      const picked = pickNightSong(nightSongs, iso, shiftDay(iso, -7), blockedFor(iso), recentFor(iso), lookbackIso, mornLeadersToday, isPraise, nightGroup, praiseLeaderLastNight, sectionLastLeader, warnings);
       if (picked) {
         const newNightSlots = existingNight ? [...(existingNight.slots || [])] : [];
         while (newNightSlots.length < 1) newNightSlots.push({});
@@ -5104,8 +5139,8 @@ async function runAutoAssign(save) {
           leader2: picked.leader2Name || '',
           key: picked.key || ''
         };
-        recentlyUsed[picked.id] = iso;
-        [picked.leaderName, picked.leader2Name].filter(Boolean).forEach(l => { leaderLastSung[l] = iso; });
+        addUsed(picked.id, iso);
+        addSingers(iso, [picked.leaderName, picked.leader2Name]);
         // Update rotation trackers for subsequent Sundays within the range
         if (isPraise) {
           [picked.leaderName, picked.leader2Name].filter(Boolean).forEach(l => { praiseLeaderLastNight[l] = iso; });
