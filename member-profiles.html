@@ -5035,11 +5035,28 @@ async function runAutoAssign(save) {
       return !sl || !sl.songId || !sl.songTitle;
     });
 
+    // Singers already assigned to a morning slot we are NOT refilling
+    const keptMornLeaders = new Set();
+    mornSlots.forEach((sl, idx) => {
+      if (!fillMorn.includes(idx) && sl && sl.songId) {
+        [sl.leader, sl.leader2].filter(Boolean).forEach(l => keptMornLeaders.add(l));
+      }
+    });
+
+    // Tempos of morning songs already in place (no 2 fast / 2 slow in the same morning)
+    const keptMornTempos = mornSlots
+      .filter((sl, idx) => !fillMorn.includes(idx) && sl && sl.songId)
+      .map(sl => ((songs.find(s => s.id === sl.songId) || {}).tempo || '').toLowerCase());
+
     // Build what leaders sang morning of this same Sunday (for same-day check)
-    const mornLeadersToday = new Set();
+    const mornLeadersToday = new Set(keptMornLeaders);
 
     if (fillMorn.length > 0) {
-      const choirSongs = songs.filter(s => (s.type || 'choir') === 'choir' && s.status !== 'retired' && s.status !== 'night');
+      // Skip any song led by a singer who already has a morning song this Sunday
+      const choirSongs = songs
+        .filter(s => (s.type || 'choir') === 'choir' && s.status !== 'retired' && s.status !== 'night')
+        .filter(s => ![s.leaderName, s.leader2Name].filter(Boolean).some(l => keptMornLeaders.has(l)))
+        .filter(s => !keptMornTempos.some(t => (t === 'fast' || t === 'slow') && t === (s.tempo || '').toLowerCase()));
       const result = pickMorningSongs(choirSongs, iso, prevIso, leaderLastSung, recentlyUsed, lookbackIso, warnings, iso);
       const newSlots = existingMorn ? [...(existingMorn.slots || [])] : [];
       result.forEach((picked, idx) => {
@@ -5172,13 +5189,14 @@ function pickTempoCombo(eligible, fallback, warnings, iso, label) {
 
   // Check if two songs share a primary leader
   function differentLeaders(s1, s2) {
-    const l1 = s1.leaderName || '';
-    const l2 = s2.leaderName || '';
-    return !l1 || !l2 || l1 !== l2;
+    const a = [s1.leaderName, s1.leader2Name].filter(Boolean);
+    const b = [s2.leaderName, s2.leader2Name].filter(Boolean);
+    return !a.some(l => b.includes(l));
   }
 
   // Try slow+mid, slow+fast, mid+fast combos first — with different leaders
-  const preferred = [['slow','mid'],['slow','fast'],['mid','fast'],['mid','slow'],['fast','slow'],['fast','mid']];
+  const preferred = [['slow','medium'],['slow','fast'],['medium','fast'],['medium','slow'],['fast','slow'],['fast','medium'],['medium','medium']]
+    .sort(() => Math.random() - 0.5);
   for (const [t1, t2] of preferred) {
     const s1 = shuffled.find(s => (s.tempo||'').toLowerCase() === t1);
     if (!s1) continue;
@@ -5267,14 +5285,18 @@ function pickNightSong(pool, iso, prevIso, leaderLastSung, recentlyUsed, lookbac
     // --- Section 1 / Section 2 rotation ---
     const lastLeaderForSection = sectionLastLeader[nightGroup] || null;
 
-    // Strict: different leader than last time this section sang + didn't sing last Sunday
+    // Singers who already have a morning song this Sunday
+    const notMorning = s => ![s.leaderName, s.leader2Name].filter(Boolean).some(l => mornLeadersToday.has(l));
+
+    // Strict: different leader than last time this section sang + didn't sing last Sunday + not singing this morning
     let pick = workingPool.find(s =>
       notLastSunday(s) &&
+      notMorning(s) &&
       s.leaderName !== lastLeaderForSection
     );
     // Relax: allow same leader as last section night if no other option
     if (!pick) {
-      pick = workingPool.find(s => notLastSunday(s));
+      pick = workingPool.find(s => notLastSunday(s) && notMorning(s));
       if (pick) warnings.push(`⚠️ ${iso} Night (${nightGroup}): No leader change available — same leader as last time.`);
     }
     // Relax: drop last-Sunday constraint too
@@ -5290,6 +5312,7 @@ function pickNightSong(pool, iso, prevIso, leaderLastSung, recentlyUsed, lookbac
       warnings.push(`⚠️ ${iso} Night: No choir songs available for ${nightGroup}.`);
       return null;
     }
+    if (!notMorning(pick)) warnings.push(`⚠️ ${iso} Night (${nightGroup}): Same singer as this morning — no other option available.`);
     return pick;
   }
 }
