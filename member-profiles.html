@@ -4076,9 +4076,24 @@ function getNightRotationGroupDynamic(targetSunday) {
 
   // Find how many regular Sundays exist between the last counted night and target (exclusive both ends)
   const lastNight = countedNights[countedNights.length - 1];
-  // Use the epoch-based index of the last counted night as the anchor,
-  // so Praise Team at position 1 vs 3 is resolved correctly.
-  const lastIndex = getSundayIndex(new Date(lastNight.date + 'T00:00:00')) % NIGHT_ROTATION.length;
+  // Anchor on the group that night ACTUALLY had (not what its date would have been),
+  // so a manual change carries forward.
+  // Positions: 0 = Section 1, 1 = Praise Team after S1, 2 = Section 2, 3 = Praise Team after S2
+  let lastIndex;
+  if (lastNight.nightGroupOverride === 'Section 1') {
+    lastIndex = 0;
+  } else if (lastNight.nightGroupOverride === 'Section 2') {
+    lastIndex = 2;
+  } else {
+    // Praise Team: which one depends on the most recent section night before it
+    const prevSection = [...countedNights].reverse().find(s => s.nightGroupOverride !== 'Praise Team');
+    if (prevSection) {
+      lastIndex = prevSection.nightGroupOverride === 'Section 2' ? 3 : 1;
+    } else {
+      const d = getSundayIndex(new Date(lastNight.date + 'T00:00:00')) % NIGHT_ROTATION.length;
+      lastIndex = (d === 1 || d === 2) ? 1 : 3;
+    }
+  }
 
   // Count unrecorded regular Sundays between lastNight and targetSunday
   const lastDate = new Date(lastNight.date + 'T00:00:00');
@@ -4093,7 +4108,8 @@ function getNightRotationGroupDynamic(targetSunday) {
       const wasRestored = musicSched.find(r => r.date === cursorIso && r.serviceType === 'restored_special_night');
       const nightRec = musicSched.find(r => r.date === cursorIso && r.serviceType === 'night');
       const hasSongs = nightRec && (nightRec.slots || []).some(sl => sl.songId);
-      if (!hasAnyCalendarEntry || wasRestored || hasSongs) steps++;
+      const isFullChoir = nightRec && nightRec.nightGroupOverride === 'Full Choir';
+      if (!isFullChoir && (!hasAnyCalendarEntry || wasRestored || hasSongs)) steps++;
     }
     cursor.setDate(cursor.getDate() + 7);
   }
@@ -4781,6 +4797,31 @@ function getSongOptions(serviceType, nightGroup, selectedId) {
   }).join('');
 }
 
+// Works out which later Sunday nights would change group if newRec is saved.
+// It walks the rotation forward on a temporary copy of the schedule, then restores the real one.
+function planNightReflow(newRec) {
+  const rotationGroups = ['Section 1', 'Section 2', 'Praise Team'];
+  const saved = musicSched;
+  const work = saved.filter(s => s.id !== newRec.id).concat([newRec]).map(s => ({ ...s }));
+  musicSched = work;
+  const changes = [];
+  try {
+    work
+      .filter(s => s.serviceType === 'night' && s.date > newRec.date && rotationGroups.includes(s.nightGroupOverride))
+      .sort((a, b) => a.date.localeCompare(b.date))
+      .forEach(s => {
+        const want = getNightRotationGroupDynamic(new Date(s.date + 'T00:00:00'));
+        if (want !== s.nightGroupOverride) {
+          changes.push({ id: s.id, date: s.date, from: s.nightGroupOverride, to: want });
+          s.nightGroupOverride = want;   // later nights are then counted from this corrected group
+        }
+      });
+  } finally {
+    musicSched = saved;
+  }
+  return changes;
+}
+
 async function saveSchedService() {
   const iso = $('schedServiceDate').value;
   const rawType = $('schedServiceTypeInternal').value || $('schedServiceType').value;
@@ -4824,7 +4865,36 @@ async function saveSchedService() {
   // Auto-dismiss the regular night card if this special is set to afternoon
   // no dismiss logic needed
 
+  // If this night's group was changed, keep the rotation going on later Sunday nights
+  let reflowChanges = [];
+  if (serviceType === 'night' && ['Section 1', 'Section 2', 'Praise Team', 'Full Choir'].includes(nightGroupOverride)) {
+    const prevGroup = existing?.nightGroupOverride || getNightRotationGroupDynamic(new Date(lookupIso + 'T00:00:00'));
+    if (nightGroupOverride !== prevGroup) {
+      reflowChanges = planNightReflow(rec);
+      if (reflowChanges.length) {
+        const list = reflowChanges.map(c => {
+          const d = new Date(c.date + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+          return `• ${d}: ${c.from} → ${c.to}`;
+        }).join('\n');
+        const ok = confirm(
+          `Changing this night to ${nightGroupOverride} affects ${reflowChanges.length} later Sunday night(s):\n\n${list}\n\n` +
+          `Their night songs will be cleared. Update them?`
+        );
+        if (!ok) return;   // Cancel: nothing is saved and the edit window stays open
+      }
+    }
+  }
+
   await idbPut('musicSched', rec);
+  for (const c of reflowChanges) {
+    const r = musicSched.find(s => s.id === c.id);
+    if (!r) continue;
+    await idbPut('musicSched', {
+      ...r,
+      nightGroupOverride: c.to,
+      slots: (r.slots || []).map(() => ({ songId: '', songTitle: '', leader: '', leader2: '', key: '' }))
+    });
+  }
   musicSched = await idbGetAll('musicSched');
   $('schedServiceModal').close();
   renderMusicSchedule();
