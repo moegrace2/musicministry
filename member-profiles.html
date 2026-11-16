@@ -1775,6 +1775,8 @@ document.querySelectorAll('.nav button').forEach(btn=>{
     // Clear search fields when switching tabs
     const memberSearchEl = $('search');
     if (memberSearchEl) memberSearchEl.value = '';
+    const songSearchEl = $('songSearch');
+    if (songSearchEl && to !== 'songLibraryView') songSearchEl.value = '';
     
     // Show/hide Manage Ministries button based on current view
     const manageMinBtn = $('manageMinHeaderBtn');
@@ -1809,6 +1811,8 @@ document.querySelectorAll('#mobileNav button').forEach(btn => {
     });
     const memberSearchEl = $('search');
     if (memberSearchEl) memberSearchEl.value = '';
+    const songSearchEl = $('songSearch');
+    if (songSearchEl && to !== 'songLibraryView') songSearchEl.value = '';
     const manageMinBtn = $('manageMinHeaderBtn');
     if (manageMinBtn) manageMinBtn.style.display = (to === 'ministriesUnified') ? '' : 'none';
     for (const sec of ['membersView','ministriesUnified','musicView','rehearsalView','songLibraryView','songHistoryView','calendarView']) {
